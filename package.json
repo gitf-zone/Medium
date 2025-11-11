@@ -1,0 +1,23 @@
+{
+  "name": "medium-articles-converter",
+  "version": "1.0.0",
+  "description": "Convert Markdown articles with Mermaid diagrams to Medium-ready format",
+  "main": "scripts/convert.js",
+  "type": "module",
+  "scripts": {
+    "convert": "node scripts/convert.js"
+  },
+  "keywords": [
+    "markdown",
+    "medium",
+    "mermaid",
+    "converter"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "inquirer": "^9.2.12",
+    "node-fetch": "^3.3.2"
+  }
+}
