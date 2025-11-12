@@ -77,28 +77,8 @@ systemctl --user enable --now app-org.kde.krdpserver.service
 # That's it.
 ```
 
-```mermaid
-graph TD
-    Start[Need Remote Desktop<br/>Arch Linux + KDE 6.2 Wayland] --> X2Go{Try X2Go}
-
-    X2Go -->|X11 Only| X2GoFail[❌ Failed<br/>Wayland Incompatible<br/>Black screens<br/>Session errors]
-
-    X2GoFail --> Guac{Try Guacamole}
-
-    Guac -->|Browser-Based| GuacSetup[Setup Steps:<br/>1. Install Tomcat<br/>2. Build from AUR<br/>3. Configure Database<br/>4. nginx Proxy<br/>5. SSL Certs]
-
-    GuacSetup -->|Complex| GuacFail[❌ Failed<br/>AUR build errors<br/>KDE 6.2 issues<br/>High latency<br/>Too complex]
-
-    GuacFail --> KRDP{Try KRDP}
-
-    KRDP -->|Native KDE| KRDPSuccess[✅ Success!<br/>30 min setup<br/>Native Wayland<br/>Standard RDP<br/>SSH tunnel security]
-
-    style X2GoFail fill:#ffcccc
-    style GuacFail fill:#ffcccc
-    style KRDPSuccess fill:#ccffcc
-```
-
-<!-- caption: The Journey Through Remote Desktop Solutions -->
+![Figure 1: The Journey Through Remote Desktop Solutions](https://raw.githubusercontent.com/gitf-zonenode /Medium/main/images/figure-1-the-journey-through-remote-desktop-solutions.png)
+*Figure 1: The Journey Through Remote Desktop Solutions*
 
 **Why KRDP Works:**
 
@@ -134,7 +114,7 @@ ssh -p 1234 -L 3389:localhost:3389 gitf.zone@myserver.com
 # Then connect with Microsoft Remote Desktop to localhost:3389
 ```
 
-![Figure 2: KRDP Architecture (Final Solution)](https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-2-krdp-architecture-final-solution.png)
+![Figure 2: KRDP Architecture (Final Solution)](https://raw.githubusercontent.com/gitf-zonenode /Medium/main/images/figure-2-krdp-architecture-final-solution.png)
 *Figure 2: KRDP Architecture (Final Solution)*
 
 ### Why This Architecture is Better
@@ -161,7 +141,7 @@ Right, this is definitely going to happen again. I've got loads of ideas brewing
 
 5. **The Arch Wiki is Good, But...** Sometimes the cutting edge moves faster than documentation. KRDP was barely mentioned in remote access guides when I started, but it's the best solution for modern KDE. Worth checking the project's own docs too.
 
-![Figure 3: Security Layers](https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-3-security-layers.png)
+![Figure 3: Security Layers](https://raw.githubusercontent.com/gitf-zonenode /Medium/main/images/figure-3-security-layers.png)
 *Figure 3: Security Layers*
 
 ### The Final Setup
