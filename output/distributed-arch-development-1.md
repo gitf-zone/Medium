@@ -77,7 +77,7 @@ systemctl --user enable --now app-org.kde.krdpserver.service
 # That's it.
 ```
 
-![Figure 1: The Journey Through Remote Desktop Solutions](https://raw.githubusercontent.com/gitf-zonenode /Medium/main/images/figure-1-the-journey-through-remote-desktop-solutions.png)
+![Figure 1: The Journey Through Remote Desktop Solutions](https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-1-the-journey-through-remote-desktop-solutions.png)
 *Figure 1: The Journey Through Remote Desktop Solutions*
 
 **Why KRDP Works:**
@@ -114,7 +114,7 @@ ssh -p 1234 -L 3389:localhost:3389 gitf.zone@myserver.com
 # Then connect with Microsoft Remote Desktop to localhost:3389
 ```
 
-![Figure 2: KRDP Architecture (Final Solution)](https://raw.githubusercontent.com/gitf-zonenode /Medium/main/images/figure-2-krdp-architecture-final-solution.png)
+![Figure 2: KRDP Architecture (Final Solution)](https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-2-krdp-architecture-final-solution.png)
 *Figure 2: KRDP Architecture (Final Solution)*
 
 ### Why This Architecture is Better
@@ -141,7 +141,7 @@ Right, this is definitely going to happen again. I've got loads of ideas brewing
 
 5. **The Arch Wiki is Good, But...** Sometimes the cutting edge moves faster than documentation. KRDP was barely mentioned in remote access guides when I started, but it's the best solution for modern KDE. Worth checking the project's own docs too.
 
-![Figure 3: Security Layers](https://raw.githubusercontent.com/gitf-zonenode /Medium/main/images/figure-3-security-layers.png)
+![Figure 3: Security Layers](https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-3-security-layers.png)
 *Figure 3: Security Layers*
 
 ### The Final Setup

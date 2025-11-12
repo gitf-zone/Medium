@@ -95,15 +95,22 @@ function convertMarkdownToHtml(markdownContent, articleTitle) {
     gfm: true
   });
 
-  // Pre-process: Convert figure images + captions to a single figure element
+  // Pre-process: Convert figure images + captions to figure element with inline styles
   // Pattern: ![Figure N: caption](url)\n*Figure N: caption*
+  // Using <figure> with inline styles + <figcaption> for semantic HTML
+  // Medium's editor may recognize figure/figcaption and populate its caption field
+  // Also adding alt and title attributes as fallback
   let processedContent = markdownContent.replace(
     /!\[(Figure \d+: [^\]]+)\]\(([^)]+)\)\s*\n\s*\*\1\*/g,
-    '<figure><img src="$2" alt="$1" /><figcaption><em>$1</em></figcaption></figure>'
+    '<figure style="text-align: center !important; margin: 2.5em auto; padding: 0; max-width: 100%;"><img src="$2" alt="$1" title="$1" style="max-width: 100%; height: auto; margin: 0 auto 1em auto; border-radius: 4px; display: block;" /><figcaption style="text-align: center !important; font-style: italic; color: #666; font-size: 0.85em; line-height: 1.4; margin: 0 auto; padding: 0; display: block;">$1</figcaption></figure>'
   );
 
-  const htmlBody = marked.parse(processedContent);
-  
+  let htmlBody = marked.parse(processedContent);
+
+  // Post-process: Remove <p> tags inside <li> to prevent extra spacing in Medium
+  // This fixes the issue where numbered lists show 1., 2., 4., etc with blank lines
+  htmlBody = htmlBody.replace(/<li>\s*<p>/g, '<li>').replace(/<\/p>\s*<\/li>/g, '</li>');
+
   // Wrap in a complete HTML document with Medium-friendly styling
   const htmlDocument = `<!DOCTYPE html>
 <html lang="en">
@@ -142,20 +149,25 @@ function convertMarkdownToHtml(markdownContent, articleTitle) {
             margin-bottom: 1.5em;
         }
         figure {
-            margin: 2em 0;
+            margin: 2.5em auto;
             text-align: center;
+            padding: 1em 0;
+            max-width: 100%;
         }
         figure img {
             max-width: 100%;
             height: auto;
             display: block;
-            margin: 0 auto;
+            margin: 0 auto 1em auto;
+            border-radius: 4px;
         }
         figcaption {
             margin-top: 0.5em;
             font-style: italic;
             color: #666;
-            font-size: 0.9em;
+            font-size: 0.95em;
+            text-align: center;
+            display: block;
         }
         img {
             max-width: 100%;

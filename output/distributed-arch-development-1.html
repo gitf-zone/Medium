@@ -35,20 +35,25 @@
             margin-bottom: 1.5em;
         }
         figure {
-            margin: 2em 0;
+            margin: 2.5em auto;
             text-align: center;
+            padding: 1em 0;
+            max-width: 100%;
         }
         figure img {
             max-width: 100%;
             height: auto;
             display: block;
-            margin: 0 auto;
+            margin: 0 auto 1em auto;
+            border-radius: 4px;
         }
         figcaption {
             margin-top: 0.5em;
             font-style: italic;
             color: #666;
-            font-size: 0.9em;
+            font-size: 0.95em;
+            text-align: center;
+            display: block;
         }
         img {
             max-width: 100%;
@@ -162,7 +167,7 @@ systemctl --user enable --now app-org.kde.krdpserver.service
 
 # That&#39;s it.
 </code></pre>
-<figure><img src="https://raw.githubusercontent.com/gitf-zonenode /Medium/main/images/figure-1-the-journey-through-remote-desktop-solutions.png" alt="Figure 1: The Journey Through Remote Desktop Solutions" /><figcaption><em>Figure 1: The Journey Through Remote Desktop Solutions</em></figcaption></figure>
+<figure style="text-align: center !important; margin: 2.5em auto; padding: 0; max-width: 100%;"><img src="https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-1-the-journey-through-remote-desktop-solutions.png" alt="Figure 1: The Journey Through Remote Desktop Solutions" title="Figure 1: The Journey Through Remote Desktop Solutions" style="max-width: 100%; height: auto; margin: 0 auto 1em auto; border-radius: 4px; display: block;" /><figcaption style="text-align: center !important; font-style: italic; color: #666; font-size: 0.85em; line-height: 1.4; margin: 0 auto; padding: 0; display: block;">Figure 1: The Journey Through Remote Desktop Solutions</figcaption></figure>
 
 <p><strong>Why KRDP Works:</strong></p>
 <ol>
@@ -187,34 +192,25 @@ ssh -p 1234 -L 3389:localhost:3389 gitf.zone@myserver.com
 
 # Then connect with Microsoft Remote Desktop to localhost:3389
 </code></pre>
-<figure><img src="https://raw.githubusercontent.com/gitf-zonenode /Medium/main/images/figure-2-krdp-architecture-final-solution.png" alt="Figure 2: KRDP Architecture (Final Solution)" /><figcaption><em>Figure 2: KRDP Architecture (Final Solution)</em></figcaption></figure>
+<figure style="text-align: center !important; margin: 2.5em auto; padding: 0; max-width: 100%;"><img src="https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-2-krdp-architecture-final-solution.png" alt="Figure 2: KRDP Architecture (Final Solution)" title="Figure 2: KRDP Architecture (Final Solution)" style="max-width: 100%; height: auto; margin: 0 auto 1em auto; border-radius: 4px; display: block;" /><figcaption style="text-align: center !important; font-style: italic; color: #666; font-size: 0.85em; line-height: 1.4; margin: 0 auto; padding: 0; display: block;">Figure 2: KRDP Architecture (Final Solution)</figcaption></figure>
 
 <h3>Why This Architecture is Better</h3>
 <ol>
-<li><p><strong>Security by Design:</strong> KRDP only listens on localhost, so it&#39;s never exposed to the internet. SSH provides authentication and encryption. Proper defence in depth without the faff.</p>
-</li>
-<li><p><strong>One Port to Forward:</strong> Only SSH port needs to be forwarded on your router. The RDP connection is tunnelled through SSH. Simple is secure.</p>
-</li>
-<li><p><strong>Mature Client Software:</strong> Microsoft Remote Desktop (free on macOS App Store) is polished, feature-rich, and reliable. No janky browser interface.</p>
-</li>
-<li><p><strong>Low Latency:</strong> Direct RDP protocol means minimal overhead—even on LAN, the difference is noticeable compared to VNC-based solutions. It&#39;s properly responsive, even over LTE when I&#39;m out and about.</p>
-</li>
+<li><strong>Security by Design:</strong> KRDP only listens on localhost, so it&#39;s never exposed to the internet. SSH provides authentication and encryption. Proper defence in depth without the faff.</li>
+<li><strong>One Port to Forward:</strong> Only SSH port needs to be forwarded on your router. The RDP connection is tunnelled through SSH. Simple is secure.</li>
+<li><strong>Mature Client Software:</strong> Microsoft Remote Desktop (free on macOS App Store) is polished, feature-rich, and reliable. No janky browser interface.</li>
+<li><strong>Low Latency:</strong> Direct RDP protocol means minimal overhead—even on LAN, the difference is noticeable compared to VNC-based solutions. It&#39;s properly responsive, even over LTE when I&#39;m out and about.</li>
 </ol>
 <h3>Lessons Learned</h3>
 <p>Right, this is definitely going to happen again. I&#39;ve got loads of ideas brewing—the Open Source and Linux world is so rich, I just lack a bit of time. So, speaking of not wasting too much of it, here are some lessons to apply next time:</p>
 <ol>
-<li><p><strong>Start with Native Solutions:</strong> Check what your desktop environment provides before reaching for third-party tools. KRDP should have been my first choice, not my last. The KDE team knows their stuff better than anyone else.</p>
-</li>
-<li><p><strong>Wayland is the Future:</strong> Solutions that don&#39;t support Wayland are on borrowed time. If you&#39;re on Arch with KDE 6.x, plan for Wayland-only. X11 solutions? Forget it.</p>
-</li>
-<li><p><strong>Complexity is a Security Risk:</strong> Every additional component (Tomcat, guacd, etc.) is another thing to configure, maintain, and secure. Simple solutions are often more secure. And definitely easier to debug at 11pm.</p>
-</li>
-<li><p><strong>Browser-Based ≠ Better:</strong> The promise of &quot;access from anywhere with no client&quot; sounds great, but native clients are faster, more reliable, and often provide a better experience. Sometimes old-school desktop apps win.</p>
-</li>
-<li><p><strong>The Arch Wiki is Good, But...</strong> Sometimes the cutting edge moves faster than documentation. KRDP was barely mentioned in remote access guides when I started, but it&#39;s the best solution for modern KDE. Worth checking the project&#39;s own docs too.</p>
-</li>
+<li><strong>Start with Native Solutions:</strong> Check what your desktop environment provides before reaching for third-party tools. KRDP should have been my first choice, not my last. The KDE team knows their stuff better than anyone else.</li>
+<li><strong>Wayland is the Future:</strong> Solutions that don&#39;t support Wayland are on borrowed time. If you&#39;re on Arch with KDE 6.x, plan for Wayland-only. X11 solutions? Forget it.</li>
+<li><strong>Complexity is a Security Risk:</strong> Every additional component (Tomcat, guacd, etc.) is another thing to configure, maintain, and secure. Simple solutions are often more secure. And definitely easier to debug at 11pm.</li>
+<li><strong>Browser-Based ≠ Better:</strong> The promise of &quot;access from anywhere with no client&quot; sounds great, but native clients are faster, more reliable, and often provide a better experience. Sometimes old-school desktop apps win.</li>
+<li><strong>The Arch Wiki is Good, But...</strong> Sometimes the cutting edge moves faster than documentation. KRDP was barely mentioned in remote access guides when I started, but it&#39;s the best solution for modern KDE. Worth checking the project&#39;s own docs too.</li>
 </ol>
-<figure><img src="https://raw.githubusercontent.com/gitf-zonenode /Medium/main/images/figure-3-security-layers.png" alt="Figure 3: Security Layers" /><figcaption><em>Figure 3: Security Layers</em></figcaption></figure>
+<figure style="text-align: center !important; margin: 2.5em auto; padding: 0; max-width: 100%;"><img src="https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-3-security-layers.png" alt="Figure 3: Security Layers" title="Figure 3: Security Layers" style="max-width: 100%; height: auto; margin: 0 auto 1em auto; border-radius: 4px; display: block;" /><figcaption style="text-align: center !important; font-style: italic; color: #666; font-size: 0.85em; line-height: 1.4; margin: 0 auto; padding: 0; display: block;">Figure 3: Security Layers</figcaption></figure>
 
 <h3>The Final Setup</h3>
 <p>After a week of trial and error, I have:</p>

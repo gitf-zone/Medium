@@ -5,7 +5,7 @@ export const config = {
   imagesDir: './images',
 
   // GitHub repository info (to be filled by user)
-  githubUser: 'gitf-zonenode ',
+  githubUser: 'gitf-zone',
   githubRepo: 'Medium',
   githubBranch: 'main',
 
