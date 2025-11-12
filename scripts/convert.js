@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import fetch from 'node-fetch';
+import { marked } from 'marked';
 import { config, getGitHubImageUrl } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -86,6 +87,121 @@ function sanitizeFilename(caption, figureNumber) {
   return `figure-${figureNumber}-${safe}.png`;
 }
 
+// Convert Markdown to HTML with Medium-friendly styling
+function convertMarkdownToHtml(markdownContent, articleTitle) {
+  // Configure marked options
+  marked.setOptions({
+    breaks: true,
+    gfm: true
+  });
+
+  const htmlBody = marked.parse(markdownContent);
+  
+  // Wrap in a complete HTML document with Medium-friendly styling
+  const htmlDocument = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${articleTitle}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 0.5em;
+            line-height: 1.2;
+        }
+        h2 {
+            font-size: 2em;
+            font-weight: 600;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }
+        h3 {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-top: 1.3em;
+            margin-bottom: 0.5em;
+        }
+        p {
+            margin-bottom: 1.5em;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 2em auto;
+        }
+        em {
+            font-style: italic;
+            display: block;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            margin-top: -1.5em;
+            margin-bottom: 2em;
+        }
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 1em;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 3px solid #333;
+            padding-left: 1em;
+            margin-left: 0;
+            font-style: italic;
+            color: #666;
+        }
+        ul, ol {
+            margin-bottom: 1.5em;
+            padding-left: 2em;
+        }
+        li {
+            margin-bottom: 0.5em;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 2em 0;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+${htmlBody}
+</body>
+</html>`;
+
+  return htmlDocument;
+}
+
 // Convert article
 async function convertArticle(filename) {
   console.log(chalk.blue(`\n📄 Converting: ${filename}`));
@@ -94,16 +210,26 @@ async function convertArticle(filename) {
   const inputPath = path.join(rootDir, config.articlesDir, filename);
   const content = await fs.readFile(inputPath, 'utf-8');
   
+  // Extract article title for HTML
+  const titleMatch = content.match(/^#\s+(.+)$/m);
+  const articleTitle = titleMatch ? titleMatch[1] : filename.replace('.md', '');
+  
   // Extract mermaid blocks
   const mermaidBlocks = extractMermaidBlocks(content);
   
   if (mermaidBlocks.length === 0) {
     console.log(chalk.yellow('  No Mermaid diagrams found in this article.'));
     
-    // Just copy the file to output
-    const outputPath = path.join(rootDir, config.outputDir, filename);
-    await fs.writeFile(outputPath, content);
+    // Just copy the file to output and create HTML
+    const outputPathMd = path.join(rootDir, config.outputDir, filename);
+    const outputPathHtml = path.join(rootDir, config.outputDir, filename.replace('.md', '.html'));
+    
+    await fs.writeFile(outputPathMd, content);
+    const htmlContent = convertMarkdownToHtml(content, articleTitle);
+    await fs.writeFile(outputPathHtml, htmlContent);
+    
     console.log(chalk.green(`  ✓ Article copied to output (no conversion needed)`));
+    console.log(chalk.green(`  ✓ HTML version created`));
     return;
   }
   
@@ -140,12 +266,18 @@ async function convertArticle(filename) {
     console.log('');
   }
   
-  // Save converted article
-  const outputPath = path.join(rootDir, config.outputDir, filename);
-  await fs.writeFile(outputPath, convertedContent);
+  // Save converted article (Markdown)
+  const outputPathMd = path.join(rootDir, config.outputDir, filename);
+  await fs.writeFile(outputPathMd, convertedContent);
+  
+  // Convert to HTML and save
+  const outputPathHtml = path.join(rootDir, config.outputDir, filename.replace('.md', '.html'));
+  const htmlContent = convertMarkdownToHtml(convertedContent, articleTitle);
+  await fs.writeFile(outputPathHtml, htmlContent);
   
   console.log(chalk.green(`✓ Conversion complete!`));
-  console.log(chalk.gray(`  Output: ${path.relative(rootDir, outputPath)}`));
+  console.log(chalk.gray(`  Markdown: ${path.relative(rootDir, outputPathMd)}`));
+  console.log(chalk.gray(`  HTML: ${path.relative(rootDir, outputPathHtml)}`));
 }
 
 // Main function
@@ -199,7 +331,8 @@ async function main() {
   
   console.log(chalk.cyan('\n📋 Next steps:'));
   console.log(chalk.gray('  1. Commit and push the images to GitHub'));
-  console.log(chalk.gray('  2. Import the converted article from ./output to Medium'));
+  console.log(chalk.gray('  2. Import the .html file into Medium (recommended)'));
+  console.log(chalk.gray('     OR use the .md file for other platforms'));
   console.log(chalk.gray('  3. Verify images display correctly\n'));
 }
 
