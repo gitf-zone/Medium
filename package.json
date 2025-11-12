@@ -5,7 +5,8 @@
   "main": "scripts/convert.js",
   "type": "module",
   "scripts": {
-    "convert": "node scripts/convert.js"
+    "convert": "node scripts/convert.js",
+    "publish": "node scripts/publish-to-medium.js"
   },
   "keywords": [
     "markdown",

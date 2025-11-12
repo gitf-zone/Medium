@@ -126,23 +126,55 @@ graph LR
 
 ## Publishing to Medium
 
-### Step 1: Push to GitHub
+### Method 1: Via Medium API (Recommended - Automatic)
+
+**Step 1: Get your Medium Integration Token**
+
+1. Go to [Medium Settings → Security and apps](https://medium.com/me/settings/security)
+2. Scroll to "Integration tokens"
+3. Click "Get integration token"
+4. Give it a name (e.g., "Article Publisher")
+5. Copy the token
+
+**Step 2: Configure the token**
+
+Edit `scripts/config.js`:
+```javascript
+mediumToken: 'YOUR_TOKEN_HERE'
+```
+
+**Step 3: Push images to GitHub**
 
 ```bash
-git add .
-git commit -m "Add article with diagrams"
+git add images/
+git commit -m "Add article images"
 git push origin main
 ```
 
-### Step 2: Import to Medium
+**Step 4: Publish**
 
-**Method 1: Import HTML (Recommended)**
+```bash
+npm run publish
+```
 
-1. Go to Medium → Stories → Import a story
-2. Upload or link to the `.html` file from `/output`
-3. Medium will automatically format everything
+The script will:
+- Let you choose which article to publish
+- Ask for publication status (draft/public/unlisted)
+- Let you add tags
+- Create the article on Medium
 
-**Method 2: Copy/Paste**
+**Recommended workflow:**
+1. Choose "Draft" mode (default)
+2. Script creates the article on Medium
+3. You get a direct link to your draft
+4. Review and edit on Medium's editor
+5. Click "Publish" when ready
+
+This gives you the best of both worlds: automated conversion + final control!
+
+### Method 2: Manual (Fallback)
+
+If the API doesn't work for some reason:
 
 1. Open the `.html` file in your browser
 2. Select all (Cmd/Ctrl + A) and copy

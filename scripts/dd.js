@@ -9,9 +9,6 @@ export const config = {
   githubRepo: 'Medium',
   githubBranch: 'main',
 
-  // Medium API (to be filled by user)
-  mediumToken: 'YOUR_MEDIUM_INTEGRATION_TOKEN',
-
   // Image settings
   imageFormat: 'png',
   mermaidTheme: 'default', // options: default, forest, dark, neutral
@@ -22,9 +19,6 @@ export const config = {
 
   // Mermaid Ink API
   mermaidInkAPI: 'https://mermaid.ink/img/',
-
-  // Medium API
-  mediumAPI: 'https://api.medium.com/v1',
 };
 
 // Helper to get GitHub raw URL for images
