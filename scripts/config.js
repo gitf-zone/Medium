@@ -3,22 +3,22 @@ export const config = {
   articlesDir: './articles',
   outputDir: './output',
   imagesDir: './images',
-  
+
   // GitHub repository info (to be filled by user)
-  githubUser: 'YOUR_GITHUB_USERNAME',
-  githubRepo: 'YOUR_REPO_NAME',
+  githubUser: 'gitf-zonenode ',
+  githubRepo: 'Medium',
   githubBranch: 'main',
-  
+
   // Image settings
   imageFormat: 'png',
   mermaidTheme: 'default', // options: default, forest, dark, neutral
-  
+
   // Caption settings
   captionPrefix: 'Figure',
   captionStyle: 'italic', // how to format captions in output
-  
+
   // Mermaid Ink API
-  mermaidInkAPI: 'https://mermaid.ink/img/'
+  mermaidInkAPI: 'https://mermaid.ink/img/',
 };
 
 // Helper to get GitHub raw URL for images

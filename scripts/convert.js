@@ -33,7 +33,8 @@ async function getMarkdownFiles() {
 // Extract mermaid blocks with captions
 function extractMermaidBlocks(content) {
   const blocks = [];
-  const mermaidRegex = /```mermaid\n([\s\S]*?)```(?:\s*<!--\s*caption:\s*(.*?)\s*-->)?/g;
+  // Updated regex to allow blank lines between ``` and caption comment
+  const mermaidRegex = /```mermaid\n([\s\S]*?)```\s*\n*\s*<!--\s*caption:\s*(.*?)\s*-->/g;
   
   let match;
   let figureNumber = 1;

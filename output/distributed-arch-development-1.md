@@ -134,32 +134,8 @@ ssh -p 1234 -L 3389:localhost:3389 gitf.zone@myserver.com
 # Then connect with Microsoft Remote Desktop to localhost:3389
 ```
 
-```mermaid
-graph LR
-    subgraph "Client: MacBook"
-        Mac[MacBook Pro]
-        MRD[Microsoft Remote<br/>Desktop Client]
-    end
-
-    subgraph "SSH Tunnel"
-        Mac -->|1. SSH Connection<br/>Port 1234| SSH[SSH Tunnel<br/>Encrypted]
-        SSH -->|2. Forward<br/>Port 3389| Local[localhost:3389]
-    end
-
-    subgraph "Server: Arch Linux"
-        Local -->|3. RDP Protocol| KRDP[KRDP Service<br/>Port 3389<br/>localhost only]
-        KRDP -->|4. Display Protocol| Wayland[KDE Plasma 6.2<br/>Wayland]
-    end
-
-    Mac -.->|Security Layer| Auth[SSH Key + 2FA]
-
-    style SSH fill:#e1f5ff
-    style KRDP fill:#fff9e1
-    style Wayland fill:#f0e1ff
-    style Auth fill:#ffe1e1
-```
-
-<!-- caption: KRDP Architecture (Final Solution) -->
+![Figure 2: KRDP Architecture (Final Solution)](https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-2-krdp-architecture-final-solution.png)
+*Figure 2: KRDP Architecture (Final Solution)*
 
 ### Why This Architecture is Better
 
@@ -185,26 +161,8 @@ Right, this is definitely going to happen again. I've got loads of ideas brewing
 
 5. **The Arch Wiki is Good, But...** Sometimes the cutting edge moves faster than documentation. KRDP was barely mentioned in remote access guides when I started, but it's the best solution for modern KDE. Worth checking the project's own docs too.
 
-```mermaid
-graph TD
-    Internet[Internet Access] --> Router[Router/Firewall<br/>Port 1234 Open]
-    Router --> SSH[SSH Server<br/>Layer 1: Authentication<br/>✓ SSH Key Required<br/>✓ 2FA for External IPs]
-
-    SSH --> Tunnel[SSH Tunnel<br/>Layer 2: Encryption<br/>✓ AES-256<br/>✓ Port Forwarding]
-
-    Tunnel --> KRDP[KRDP Server<br/>Layer 3: RDP Auth<br/>✓ Username/Password<br/>✓ TLS Certificate]
-
-    KRDP --> Desktop[KDE Desktop<br/>Full Access]
-
-    LAN[LAN Access] --> Router
-
-    style SSH fill:#ff9999
-    style Tunnel fill:#ffcc99
-    style KRDP fill:#ffff99
-    style Desktop fill:#99ff99
-```
-
-<!-- caption: Security Layers -->
+![Figure 3: Security Layers](https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-3-security-layers.png)
+*Figure 3: Security Layers*
 
 ### The Final Setup
 
