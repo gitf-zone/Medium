@@ -95,14 +95,13 @@ function convertMarkdownToHtml(markdownContent, articleTitle) {
     gfm: true
   });
 
-  // Pre-process: Convert figure images + captions to figure element with inline styles
+  // Pre-process: Convert figure images + captions to standalone img + caption paragraph
   // Pattern: ![Figure N: caption](url)\n*Figure N: caption*
-  // Using <figure> with inline styles + <figcaption> for semantic HTML
-  // Medium's editor may recognize figure/figcaption and populate its caption field
-  // Also adding alt and title attributes as fallback
+  // Medium strips figure/figcaption, so we use standalone img with alt/title
+  // Plus a separate styled paragraph for the visible caption
   let processedContent = markdownContent.replace(
     /!\[(Figure \d+: [^\]]+)\]\(([^)]+)\)\s*\n\s*\*\1\*/g,
-    '<figure style="text-align: center !important; margin: 2.5em auto; padding: 0; max-width: 100%;"><img src="$2" alt="$1" title="$1" style="max-width: 100%; height: auto; margin: 0 auto 1em auto; border-radius: 4px; display: block;" /><figcaption style="text-align: center !important; font-style: italic; color: #666; font-size: 0.85em; line-height: 1.4; margin: 0 auto; padding: 0; display: block;">$1</figcaption></figure>'
+    '<p style="text-align: center; margin: 2em auto 0.5em;"><img src="$2" alt="$1" title="$1" style="max-width: 100%; height: auto; display: inline-block; border-radius: 4px;" /></p><p style="text-align: center; font-style: italic; color: #666; font-size: 0.85em; margin: 0.5em auto 2em; line-height: 1.4;">$1</p>'
   );
 
   let htmlBody = marked.parse(processedContent);
