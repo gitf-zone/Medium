@@ -46,6 +46,11 @@ function convertToMediumHtml(markdown) {
   // We need to convert our markdown to Medium-compatible HTML
   let html = markdown;
 
+  // IMPORTANT: Convert images FIRST before other conversions
+  // Convert images - Medium needs <img> tags
+  // Pattern: ![alt text](url)
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />');
+
   // Convert headers
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
@@ -57,9 +62,6 @@ function convertToMediumHtml(markdown) {
 
   // Convert links
   html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>');
-
-  // Convert images - Medium needs <img> tags
-  html = html.replace(/!\[(.+?)\]\((.+?)\)/g, '<img src="$2" alt="$1" />');
 
   // Convert code blocks
   html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');

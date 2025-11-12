@@ -95,7 +95,14 @@ function convertMarkdownToHtml(markdownContent, articleTitle) {
     gfm: true
   });
 
-  const htmlBody = marked.parse(markdownContent);
+  // Pre-process: Convert figure images + captions to a single figure element
+  // Pattern: ![Figure N: caption](url)\n*Figure N: caption*
+  let processedContent = markdownContent.replace(
+    /!\[(Figure \d+: [^\]]+)\]\(([^)]+)\)\s*\n\s*\*\1\*/g,
+    '<figure><img src="$2" alt="$1" /><figcaption><em>$1</em></figcaption></figure>'
+  );
+
+  const htmlBody = marked.parse(processedContent);
   
   // Wrap in a complete HTML document with Medium-friendly styling
   const htmlDocument = `<!DOCTYPE html>
@@ -134,6 +141,22 @@ function convertMarkdownToHtml(markdownContent, articleTitle) {
         p {
             margin-bottom: 1.5em;
         }
+        figure {
+            margin: 2em 0;
+            text-align: center;
+        }
+        figure img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        figcaption {
+            margin-top: 0.5em;
+            font-style: italic;
+            color: #666;
+            font-size: 0.9em;
+        }
         img {
             max-width: 100%;
             height: auto;
@@ -142,12 +165,6 @@ function convertMarkdownToHtml(markdownContent, articleTitle) {
         }
         em {
             font-style: italic;
-            display: block;
-            text-align: center;
-            color: #666;
-            font-size: 0.9em;
-            margin-top: -1.5em;
-            margin-bottom: 2em;
         }
         code {
             background-color: #f5f5f5;
