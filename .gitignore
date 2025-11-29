@@ -38,6 +38,7 @@ lerna-debug.log*
 # Environment variables
 .env
 .env.local
+.env.secrets
 .env.*.local
 
 # Testing
