@@ -238,7 +238,7 @@ Sometimes the newest tool is the right tool—especially when it's built by the 
 
 ### The Security Dilemma
 
-After setting up remote access to my Arch Linux server, I faced a classic security vs. convenience trade-off:
+After the KRDP adventure (see Part 1), my Arch box was properly accessible from anywhere. Brilliant. But that opened a new can of worms — a classic security vs. convenience trade-off:
 
 **The Problem:**
 
@@ -249,7 +249,7 @@ After setting up remote access to my Arch Linux server, I faced a classic securi
 
 **The Question:** Can SSH authentication be context-aware? Why should my laptop, sitting 3 feet from the server on my secure WiFi, require the same 2FA as a connection from a random IP address?
 
-### The Traditional Approaches (and Why They're Wrong)
+### The Traditional Approaches (and Why They Fall Short)
 
 **Option 1: No 2FA**
 
@@ -542,30 +542,30 @@ The best part? Once it's set up, you forget it's there—until you're grateful i
 
 ---
 
-**Next in this series:** "Distributed Development: Exposing Databases Securely Across Your Network"
+**Next in this series:** "Building a Distributed Development Environment: When to Expose, When to Tunnel"
 
 ---
 
 # Post 3: "Building a Distributed Development Environment: When to Expose, When to Tunnel"
 
-## Subtitle: Architecting Secure Database Access for LLM Development Across Multiple Devices
+## Subtitle: Architecting Secure Service Access Across Server and Laptop
 
 ### The Modern Development Dilemma
 
-I'm building an LLM-powered knowledge graph application. The architecture includes:
+I'm building an LLM-powered knowledge graph application. My Arch Linux server does all the heavy lifting:
 
 - PostgreSQL 17 with Apache AGE (graph database extension)
 - Neo4j 5.26 (for development and visualization)
-- Ollama (running on MacBook for better GPU performance)
-- Python code that orchestrates everything
+- Ollama with an RTX 5080 (16GB VRAM — proper local LLM inference at last)
+- Python services that orchestrate everything
 
-Initially, everything ran on one machine. But as the project grew, I hit a fundamental constraint:
+But here's the thing: I don't always want to work directly on the server. My MacBook is where the IDE lives, where the browser tabs multiply, where the actual _developing_ happens. The server is the engine room; the laptop is the bridge.
 
-**The Problem:** My Arch Linux server has the horsepower for databases, but my MacBook has the GPU for LLM inference. My code needs to access both.
+**The Problem:** All my services run on the server, but my development workflow lives on the MacBook. I need secure, performant access to databases and APIs across devices — without exposing everything to the internet.
 
 ### The Architecture Challenge
 
-There are three approaches to distributed database access, each with different security and performance trade-offs:
+There are three approaches to accessing server services from a remote device, each with different security and performance trade-offs:
 
 #### Option 1: Everything via HTTPS + 2FA (Maximum Security)
 
@@ -707,11 +707,13 @@ port = 5432
   │  MacBook        │                 │     Server         │          │
   │  192.168.1.192  │                 │  192.168.1.107     │          │
   │                 │                 │                    │          │
-  │  • Ollama       │    Direct       │  • PostgreSQL      │          │
-  │    (11434)      │  Connections    │    (localhost:5432)│          │
-  │  • Python Code  ├────────────────→│  • Neo4j           │          │
+  │  • IDE, Browser │    Direct       │  • PostgreSQL      │          │
+  │  • Python Code  │  Connections    │    (localhost:5432)│          │
+  │  • Dev Tools    ├────────────────→│  • Neo4j           │          │
   │                 │    No Tunnel    │    (192.168.1.107: │          │
   │                 │    No Overhead  │     7474, 7687)    │          │
+  │                 │                 │  • Ollama + RTX5080│          │
+  │                 │                 │    (localhost:11434)│         │
   │                 │                 │  • nginx           │          │
   │                 │                 │    (80, 443)       │          │
   └─────────────────┴─────────────────┴────────────────────┴──────────┘
@@ -734,10 +736,12 @@ port = 5432
                     │  SSH Tunnel Required:             │
                     │  ssh -L 7474:localhost:7474 \     │
                     │      -L 7687:localhost:7687 \     │
+                    │      -L 11434:localhost:11434 \   │
                     │      user@services.example.com    │
                     │                                   │
                     │  Then connect to:                 │
                     │  bolt://localhost:7687            │
+                    │  http://localhost:11434 (Ollama)  │
                     │                                   │
                     └───────────────────────────────────┘
 ```
@@ -804,6 +808,7 @@ echo "Creating SSH tunnel to server..."
 ssh -N -L 7474:localhost:7474 \
        -L 7687:localhost:7687 \
        -L 5432:localhost:5432 \
+       -L 11434:localhost:11434 \
        user@services.getintotheflow.zone \
        &
 
@@ -812,6 +817,7 @@ echo "Tunnel established (PID: $TUNNEL_PID)"
 echo "Neo4j Browser: http://localhost:7474"
 echo "Neo4j Bolt: bolt://localhost:7687"
 echo "PostgreSQL: localhost:5432"
+echo "Ollama API: http://localhost:11434"
 echo ""
 echo "Press Ctrl+C to close tunnel"
 
@@ -979,20 +985,22 @@ This is usually because:
 
 ### The Final Architecture
 
-After all this work, here's what I have:
+After all this work, here's what I've ended up with — and honestly, I'm rather pleased with it:
 
 **On Server (Arch Linux):**
 
 - PostgreSQL: localhost:5432 (internal only)
 - Neo4j: localhost:7474 + 192.168.1.107:7474 (internal + LAN)
+- Ollama: localhost:11434 (RTX 5080 GPU, primary LLM inference)
 - nginx: 443 (internet, with 2FA for sensitive endpoints)
 - SSH: port 2356 (internet, with conditional 2FA)
 
-**On MacBook:**
+**On MacBook (Thin Client):**
 
-- Ollama: localhost:11434 (internal only)
+- IDE, browser, terminal — the development interface
 - Python code: connects via context-aware logic
 - SSH tunnel script: for remote work
+- Everything else? On the server where it belongs.
 
 **Performance:**
 
@@ -1027,4 +1035,3 @@ If you found this series helpful, you might also enjoy:
 
 - "fail2ban: The Silent Guardian of Your SSH Port"
 - "Authelia: Building a Self-Hosted SSO with TOTP 2FA"
-- "KDE on Wayland: What Works, What Doesn't, and Why You Should Switch"

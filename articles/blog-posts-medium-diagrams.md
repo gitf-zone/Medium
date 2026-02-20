@@ -191,37 +191,35 @@ graph TB
     subgraph Internet["☁️ Internet (Hostile)"]
         Ext[External Access<br/>Coffee Shop / 5G<br/>82.x.x.x]
     end
-    
+
     subgraph Router["🔒 Home Network Perimeter"]
         FW[Freebox Router<br/>192.168.1.1<br/>WPA3 + Firewall]
     end
-    
+
     subgraph LAN["🏠 Trusted LAN (192.168.1.0/24)"]
         direction TB
-        
+
         subgraph Mac["💻 MacBook (192.168.1.192)"]
-            Ollama[Ollama LLM<br/>:11434<br/>GPU Inference]
-            Code[Python Code<br/>Context-Aware]
+            Code[Dev Tools + Python Code<br/>Context-Aware]
         end
-        
+
         subgraph Server["🖥️ Server (192.168.1.107)"]
             PG[(PostgreSQL<br/>:5432<br/>localhost only)]
             Neo[(Neo4j<br/>:7474 :7687<br/>localhost + LAN)]
+            Ollama[Ollama LLM<br/>:11434<br/>RTX 5080 GPU]
             Nginx[nginx<br/>:443<br/>+ Authelia 2FA]
         end
     end
-    
+
     Ext -.->|SSH Tunnel<br/>Port 2356<br/>+2FA| FW
     FW --> Server
-    
+
     Code -->|Direct LAN| Neo
-    Code -.->|SSH Tunnel<br/>when remote| Neo
-    
-    Code -->|Local only| Ollama
-    Server -->|HTTP| Ollama
-    
+    Code -->|Direct LAN| Ollama
+    Code -.->|SSH Tunnel<br/>when remote| Server
+
     PG -.->|localhost<br/>Unix socket| Server
-    
+
     style LAN fill:#e8f5e9
     style Internet fill:#ffebee
     style Mac fill:#e3f2fd
