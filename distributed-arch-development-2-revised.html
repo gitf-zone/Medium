@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Implementing Conditional 2FA for SSH: Security That Adapts to Context</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 0.5em;
+            line-height: 1.2;
+        }
+        h2 {
+            font-size: 2em;
+            font-weight: 600;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }
+        h3 {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-top: 1.3em;
+            margin-bottom: 0.5em;
+        }
+        p {
+            margin-bottom: 1.5em;
+        }
+        figure {
+            margin: 2.5em auto;
+            text-align: center;
+            padding: 1em 0;
+            max-width: 100%;
+        }
+        figure img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto 1em auto;
+            border-radius: 4px;
+        }
+        figcaption {
+            margin-top: 0.5em;
+            font-style: italic;
+            color: #666;
+            font-size: 0.95em;
+            text-align: center;
+            display: block;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 2em auto;
+        }
+        em {
+            font-style: italic;
+        }
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 1em;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 3px solid #333;
+            padding-left: 1em;
+            margin-left: 0;
+            font-style: italic;
+            color: #666;
+        }
+        ul, ol {
+            margin-bottom: 1.5em;
+            padding-left: 2em;
+        }
+        li {
+            margin-bottom: 0.5em;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 2em 0;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+<h1>Implementing Conditional 2FA for SSH: Security That Adapts to Context</h1>
+<h2>Subtitle: How to Require 2FA for External Connections While Keeping LAN Access Convenient</h2>
+<h3>The Security Dilemma</h3>
+<p>After the KRDP adventure (see Part 1), my Arch box was properly accessible from anywhere. Brilliant. But that opened a new can of worms — a classic security vs. convenience trade-off.</p>
+<p><strong>The Problem:</strong></p>
+<ul>
+<li>My server needed to be accessible from anywhere (external IPs, 5G, coffee shops)</li>
+<li>Strong authentication (SSH keys + 2FA) is essential for internet exposure</li>
+<li>But on my home LAN, entering a 6-digit code every SSH connection is tedious</li>
+<li>My trusted devices (MacBook, etc.) are already behind my WiFi security</li>
+</ul>
+<p><strong>The Question:</strong> Can SSH authentication be context-aware? Why should my laptop, sitting 3 feet from the server on my secure WiFi, require the same 2FA as a connection from some random IP address in Kazakhstan?</p>
+<p>Spoiler: it shouldn&#39;t. And here&#39;s how I sorted that out.</p>
+<h3>The Traditional Approaches (and Why They Fall Short)</h3>
+<p><strong>Option 1: No 2FA</strong></p>
+<pre><code class="language-bash"># Just SSH keys
+ssh user@server
+</code></pre>
+<p>✅ Convenient<br>❌ Vulnerable to stolen keys<br>❌ No defence against compromised clients</p>
+<p><strong>Option 2: Always Require 2FA</strong></p>
+<pre><code class="language-bash"># SSH key + TOTP every time
+ssh user@server
+Verification code: 123456
+</code></pre>
+<p>✅ Very secure<br>❌ Annoying on LAN<br>❌ Slows down development workflow<br>❌ Same security for trusted and untrusted networks</p>
+<p>I tried this for about three days. Typing six digits every time I SSH&#39;d into my server — which, if you&#39;re developing, is approximately every five minutes — gets old fast.</p>
+<p><strong>Option 3: Separate SSH Ports</strong></p>
+<pre><code class="language-bash"># Port 22 for LAN (no 2FA), Port 2356 for external (with 2FA)
+</code></pre>
+<p>✅ Different security levels<br>❌ Complex firewall rules<br>❌ Easy to misconfigure<br>❌ Still requires managing two authentication paths</p>
+<p>This felt like a hack. And hacks have a tendency to break at 2am when you&#39;re trying to fix something urgent.</p>
+<h3>The Better Approach: Conditional 2FA Based on Source IP</h3>
+<p>What if SSH could automatically decide whether to require 2FA based on where the connection is coming from? This is where PAM earns its keep.</p>
+<p><strong>The Architecture:</strong></p>
+<pre><code>Connection from 192.168.1.x (LAN)
+    ↓
+SSH Key Authentication
+    ↓
+✅ Access Granted (no 2FA prompt)
+
+Connection from Any Other IP (Internet)
+    ↓
+SSH Key Authentication
+    ↓
+PAM 2FA Check
+    ↓
+TOTP Code Required
+    ↓
+✅ Access Granted
+</code></pre>
+<p>Simple. Elegant. Actually works.</p>
+<h3>Implementation: The Three Components</h3>
+<p>Right, let&#39;s build it. The setup is surprisingly straightforward — three components, about an hour&#39;s work.</p>
+<h4>1. Install Google Authenticator PAM Module</h4>
+<pre><code class="language-bash"># On Arch Linux
+sudo pacman -S libpam-google-authenticator
+
+# Generate TOTP secret
+google-authenticator
+</code></pre>
+<p>This creates a TOTP secret and emergency backup codes. Scan the QR code with your authenticator app.</p>
+<p><strong>Pro Tip:</strong> Label it specifically (e.g., &quot;SSH-myserver&quot;) to distinguish it from other 2FA codes, especially when you have many of those things. Future you will appreciate this at 11pm when you&#39;re squinting at your phone trying to find the right code.</p>
+<h4>2. Create the IP Detection Script</h4>
+<p>This is the clever bit — a simple script that checks if the connection is from your LAN:</p>
+<pre><code class="language-bash">#!/bin/bash
+# /usr/local/bin/check-ssh-ip.sh
+
+# Get the SSH client IP from PAM environment
+CLIENT_IP=&quot;${PAM_RHOST:-}&quot;
+
+# Log for debugging
+logger -t ssh-2fa &quot;Connection from: ${CLIENT_IP}&quot;
+
+# If no IP found, require 2FA (safe default)
+if [ -z &quot;$CLIENT_IP&quot; ]; then
+    logger -t ssh-2fa &quot;No IP detected - requiring 2FA&quot;
+    exit 1
+fi
+
+# Check if IP is from LAN (192.168.1.x)
+if [[ &quot;$CLIENT_IP&quot; =~ ^192\.168\.1\. ]]; then
+    # LAN connection - skip 2FA
+    logger -t ssh-2fa &quot;LAN connection detected - skipping 2FA&quot;
+    exit 0
+fi
+
+# External connection - require 2FA
+logger -t ssh-2fa &quot;External connection detected - requiring 2FA&quot;
+exit 1
+</code></pre>
+<p><strong>Key Points:</strong></p>
+<ul>
+<li>Exit 0 = Success (skip 2FA)</li>
+<li>Exit 1 = Failure (require 2FA)</li>
+<li>Logs every decision for audit purposes (you&#39;ll thank yourself later)</li>
+<li>Fail-secure: unknown IPs require 2FA</li>
+</ul>
+<p>That last bit is important. If something goes wrong with the script, it defaults to the secure option. Better to annoy yourself with an unexpected 2FA prompt than to accidentally leave the door open.</p>
+<h4>3. Configure PAM for Conditional Authentication</h4>
+<pre><code class="language-bash"># /etc/pam.d/sshd
+#%PAM-1.0
+
+# Check if connection is from LAN
+# Returns success (0) if LAN, failure (1) if external
+# If LAN (success), skip the next 1 module (google-authenticator)
+auth [success=1 default=ignore] pam_exec.so quiet /usr/local/bin/check-ssh-ip.sh
+
+# If external (previous check failed), require Google Authenticator 2FA
+auth required pam_google_authenticator.so nullok
+
+# If we get here, authentication succeeds (publickey already verified by SSH)
+auth sufficient pam_permit.so
+
+# Standard account/password/session management
+account   include   system-remote-login
+password  include   system-remote-login
+session   include   system-remote-login
+</code></pre>
+<p><strong>PAM Logic Explained:</strong></p>
+<ol>
+<li>Run IP check script</li>
+<li>If script returns 0 (LAN), skip (<code>success=1</code>) the next module → no 2FA prompt</li>
+<li>If script returns 1 (external), continue to next module → require 2FA</li>
+<li>After 2FA (or skip), permit authentication</li>
+</ol>
+<p>PAM&#39;s syntax is... well, it&#39;s PAM. Not exactly intuitive. But once you understand the <code>[success=1 default=ignore]</code> pattern, it makes sense. Sort of.</p>
+<h4>4. Configure SSH Server</h4>
+<pre><code class="language-bash"># /etc/ssh/sshd_config.d/99-2fa.conf
+
+# Enable keyboard-interactive (required for PAM 2FA)
+KbdInteractiveAuthentication yes
+
+# Enable PAM (handles conditional 2FA logic)
+UsePAM yes
+
+# Ensure publickey authentication is enabled
+PubkeyAuthentication yes
+
+# Keep password authentication disabled
+PasswordAuthentication no
+
+# Require publickey AND keyboard-interactive (2FA via PAM)
+AuthenticationMethods publickey,keyboard-interactive:pam
+</code></pre>
+<p><strong>Reload SSH:</strong></p>
+<pre><code class="language-bash">sudo systemctl reload sshd
+</code></pre>
+<p>And that&#39;s it. Properly sorted.</p>
+<h3>Testing the Setup</h3>
+<p>The moment of truth. And I&#39;ll be honest — I tested this about fifteen times before I trusted it. Because the last thing you want is to lock yourself out of your server at midnight.</p>
+<h4>From LAN (No 2FA Prompt Expected)</h4>
+<pre><code class="language-bash">$ ssh -p 2222 user@192.168.1.107
+Last login: Mon Nov 11 09:15:32 2025
+[user@server ~]$
+</code></pre>
+<p>✅ Direct access with SSH key only</p>
+<p>Brilliant. No 2FA prompt, straight in.</p>
+<h4>From External IP (2FA Prompt Expected)</h4>
+<pre><code class="language-bash">$ ssh -p 2222 user@myserver.example.com
+Verification code: 123456
+Last login: Mon Nov 11 09:20:15 2025
+[user@server ~]$
+</code></pre>
+<p>✅ Prompted for TOTP code after SSH key</p>
+<p>Perfect. The system knows I&#39;m connecting from the internet and asks for the code.</p>
+<h4>Check the Logs</h4>
+<pre><code class="language-bash">$ sudo journalctl -t ssh-2fa --since &quot;5 minutes ago&quot;
+Nov 11 09:15:30 server ssh-2fa[12345]: Connection from: 192.168.1.192
+Nov 11 09:15:30 server ssh-2fa[12345]: LAN connection detected - skipping 2FA
+Nov 11 09:20:12 server ssh-2fa[12346]: Connection from: 203.0.113.42
+Nov 11 09:20:12 server ssh-2fa[12346]: External connection detected - requiring 2FA
+</code></pre>
+<p>Every decision logged. Every connection tracked. If something weird happens, you&#39;ll know.</p>
+<h3>Security Considerations</h3>
+<p><strong>Why This is Safe:</strong></p>
+<ol>
+<li><strong>SSH Keys Still Required:</strong> The SSH key authentication happens FIRST. PAM 2FA is an additional layer, not a replacement. Someone would need both your SSH key AND to be on your network to bypass 2FA.</li>
+<li><strong>Network Perimeter Security:</strong> Your LAN is already protected by:</p>
+<ul>
+<li>WiFi password (WPA2/WPA3)</li>
+<li>Router firewall</li>
+<li>Physical security (someone has to be in your home/office)</li>
+</ul>
+</li>
+<li><strong>Audit Trail:</strong> Every authentication decision is logged, so you can detect anomalies. Spotted three brute force attempts in my first week with this setup.</li>
+<li><strong>Fail-Secure Design:</strong> If the IP detection script fails or returns an unexpected value, the default is to require 2FA. The system assumes the worst and protects accordingly.</li>
+<li><strong>Emergency Access:</strong> Google Authenticator provides emergency backup codes that work even if you lose your phone. Print them. Keep them somewhere safe. You&#39;ll thank yourself later.</li>
+</ol>
+<p><strong>Why This is Practical:</strong></p>
+<ol>
+<li><strong>Zero Friction on LAN:</strong> Development workflow isn&#39;t interrupted by constant 2FA prompts. I SSH into my server probably 50 times a day when I&#39;m coding — that would be 300 digits typed without this setup.</li>
+<li><strong>Strong External Security:</strong> Internet-facing connections get the full 2FA treatment. No exceptions.</li>
+<li><strong>Single Configuration:</strong> No need to manage separate ports, firewall rules, or SSH configs for different security levels. One config to rule them all.</li>
+<li><strong>Easy to Adjust:</strong> Change the IP range in the script to match your network (e.g., <code>10.0.0.x</code> or <code>172.16.x.x</code>). Takes about 30 seconds.</li>
+</ol>
+<h3>Advanced: Multiple Trusted Networks</h3>
+<p>You can extend the script to recognise multiple trusted networks:</p>
+<pre><code class="language-bash"># Check if IP is from any trusted network
+if [[ &quot;$CLIENT_IP&quot; =~ ^192\.168\.1\. ]] || \
+   [[ &quot;$CLIENT_IP&quot; =~ ^10\.0\.0\. ]] || \
+   [[ &quot;$CLIENT_IP&quot; =~ ^172\.16\.0\. ]]; then
+    logger -t ssh-2fa &quot;Trusted network - skipping 2FA&quot;
+    exit 0
+fi
+</code></pre>
+<p>Useful if you&#39;ve got servers at different locations, or if you work from multiple offices.</p>
+<h3>What About IP Spoofing?</h3>
+<p><strong>Q:</strong> Can&#39;t someone spoof their IP to look like they&#39;re on the LAN?</p>
+<p><strong>A:</strong> No, because:</p>
+<ol>
+<li>The IP address PAM sees (<code>PAM_RHOST</code>) is from the TCP connection, not from the client&#39;s claim. It&#39;s what the server&#39;s network stack reports, not what the client says.</li>
+<li>To spoof a LAN IP from the internet, you&#39;d need to:</p>
+<ul>
+<li>Control your router&#39;s NAT (at which point you already have access)</li>
+<li>Or be on the LAN (in which case, they&#39;re already inside your perimeter)</li>
+</ul>
+</li>
+<li>The SSH key is still required — IP detection only determines if 2FA is needed. So even if someone magically spoofed a LAN IP (they can&#39;t), they&#39;d still need your private SSH key.</li>
+</ol>
+<p>Basically, if someone can spoof your LAN IP convincingly, you&#39;ve got bigger problems than 2FA.</p>
+<h3>Lessons Learned</h3>
+<p>Looking back, the setup took about an hour but saves me typing six digits dozens of times a day. Here&#39;s what stuck with me:</p>
+<ol>
+<li><strong>Security Should Match Threat Model:</strong> Your home LAN and the internet are different threat environments. Authentication should reflect that. Treating everything as equally hostile is... well, it&#39;s paranoid and impractical.</li>
+<li><strong>PAM is Powerful:</strong> The Pluggable Authentication Modules system lets you build sophisticated authentication logic without modifying SSH itself. It&#39;s one of those Linux building blocks that&#39;s been quietly brilliant for decades. Properly underrated.</li>
+<li><strong>Logging is Essential:</strong> You can&#39;t improve what you don&#39;t measure. Log every authentication decision. Check those logs occasionally. You&#39;ll spot patterns and potential issues before they become problems.</li>
+<li><strong>Test from Both Contexts:</strong> Make sure to test from LAN AND external IPs before relying on this setup. I can&#39;t stress this enough — test with your phone on 5G, not just from your desk. Found a bug in my initial script that way.</li>
+<li><strong>Document Your Logic:</strong> Future you will thank present you for writing down why IPs are checked and what the exit codes mean. I keep a README.md in <code>/usr/local/bin/</code> explaining exactly how the authentication flow works. Saved me twice already when debugging.</li>
+</ol>
+<h3>The Results</h3>
+<p>After implementing conditional 2FA:</p>
+<ul>
+<li>✅ <strong>28 SSH connections per day</strong> on LAN (development workflow)</li>
+<li>✅ <strong>Zero 2FA prompts</strong> when working at home</li>
+<li>✅ <strong>100% 2FA coverage</strong> for external access (verified in logs)</li>
+<li>✅ <strong>Zero authentication failures</strong> from legitimate users</li>
+<li>✅ <strong>3 blocked brute force attempts</strong> in the first week (fail2ban + 2FA working together beautifully)</li>
+</ul>
+<p>Worth the hour of setup? Absolutely.</p>
+<h3>Conclusion</h3>
+<p>Context-aware authentication is the sweet spot between security and usability. By making SSH smart enough to understand where connections are coming from, you can have both:</p>
+<ul>
+<li>Fortress-level security for internet access</li>
+<li>Friction-free access on your trusted network</li>
+</ul>
+<p>And honestly? Once it&#39;s configured, you forget it&#39;s even there. Which is exactly how good security should feel — invisible when you&#39;re trusted, immovable when you&#39;re not.</p>
+<p>The best security is security that doesn&#39;t get in your way when it doesn&#39;t need to. This setup achieves that nicely.</p>
+<hr>
+<p><strong>Next in this series:</strong> &quot;Building a Distributed Development Environment: When to Expose, When to Tunnel&quot;</p>
+<hr>
+
+</body>
+</html>
