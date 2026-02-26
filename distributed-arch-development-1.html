@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Quest for Perfect Remote Desktop on Arch Linux + KDE 6.2</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 0.5em;
+            line-height: 1.2;
+        }
+        h2 {
+            font-size: 2em;
+            font-weight: 600;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }
+        h3 {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-top: 1.3em;
+            margin-bottom: 0.5em;
+        }
+        p {
+            margin-bottom: 1.5em;
+        }
+        figure {
+            margin: 2.5em auto;
+            text-align: center;
+            padding: 1em 0;
+            max-width: 100%;
+        }
+        figure img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto 1em auto;
+            border-radius: 4px;
+        }
+        figcaption {
+            margin-top: 0.5em;
+            font-style: italic;
+            color: #666;
+            font-size: 0.95em;
+            text-align: center;
+            display: block;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 2em auto;
+        }
+        em {
+            font-style: italic;
+        }
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 1em;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 3px solid #333;
+            padding-left: 1em;
+            margin-left: 0;
+            font-style: italic;
+            color: #666;
+        }
+        ul, ol {
+            margin-bottom: 1.5em;
+            padding-left: 2em;
+        }
+        li {
+            margin-bottom: 0.5em;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 2em 0;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+<h1>The Quest for Perfect Remote Desktop on Arch Linux + KDE 6.2</h1>
+<h2>Subtitle: Why Guacamole Failed and How KRDP Saved the Day</h2>
+<h3>Introduction</h3>
+<p>My Linux box has become my main squeeze. For years, I didn&#39;t even consider this option—a MacBook is basically Linux, right? And I&#39;ll admit, it&#39;s still a cracking laptop. But about a year ago, something shifted. I built my own Linux machine from scratch. Arch Linux. Actually, I remember now—it started with a canteen chat that somehow drifted towards Black Arch, and hacking has always intrigued me...</p>
+<p>But there&#39;s a snag: I&#39;m not always home. And even when I am, that lovely 27&quot; monitor has multiple fans (my fault—I put HDMI and USB-C cables everywhere for self-service). So there it is: I needed proper remote access to my KDE desktop.</p>
+<p>So I decided to turn my Arch Linux box into a proper remote development server. Should be dead simple, right?</p>
+<p>What followed was a week-long journey through compatibility issues, protocol limitations, and architectural decisions that taught me more about Linux remote access than any tutorial ever could.</p>
+<p>Here&#39;s the story of how I went from zero to a production-ready remote access setup, and why sometimes the newest solution is actually the best one.</p>
+<h3>The Requirements</h3>
+<p>My setup was simple on paper:</p>
+<ul>
+<li><strong>Server:</strong> Arch Linux (latest, always rolling)</li>
+<li><strong>Desktop Environment:</strong> KDE Plasma 6.2 on Wayland</li>
+<li><strong>Client:</strong> MacBook Pro</li>
+<li><strong>Goal:</strong> Seamless remote desktop access with good performance</li>
+<li><strong>Constraint:</strong> Must work with Wayland (no X11 fallback) - native installation instead of containers for system tools</li>
+</ul>
+<h3>Attempt #1: X2Go (The X11 Problem)</h3>
+<p>X2Go is a mature, well-documented remote desktop solution. The Arch Wiki has a great guide, and many people swear by it. Spent an afternoon or more getting it all configured. Launched it. Black screen. Brilliant.</p>
+<p><strong>The Problem:</strong> X2Go is fundamentally built on X11 technology. While KDE Plasma can run on X11, I was running Wayland for better performance and modern features. X2Go kept trying to start X11 sessions, leading to:</p>
+<ul>
+<li>Session startup failures</li>
+<li>Black screens</li>
+<li>Cryptic error messages about display servers</li>
+</ul>
+<p><strong>The Lesson:</strong> When your desktop environment has moved to Wayland, X11-based solutions aren&#39;t just legacy—they&#39;re incompatible. No amount of configuration will bridge that gap. I should&#39;ve spotted this earlier, but hindsight&#39;s brilliant like that.</p>
+<h3>Attempt #2: Apache Guacamole (The Browser Dream)</h3>
+<p>Right, Guacamole. I spent three solid days on this beast.</p>
+<p>A browser-based remote desktop gateway that supports RDP, VNC, and SSH. The promise was compelling: access your desktop from any device with a web browser, no client software needed. Sounded perfect.</p>
+<p>The setup marathon:</p>
+<ol>
+<li>Set up Tomcat (Guacamole requires a Java servlet container)</li>
+<li>Installed guacd (the Guacamole daemon)</li>
+<li>Configured the database</li>
+<li>Set up nginx as a reverse proxy</li>
+<li>Generated SSL certificates</li>
+</ol>
+<p><strong>The Problems:</strong></p>
+<ol>
+<li><strong>Compilation Issues:</strong> Guacamole&#39;s dependencies on Arch Linux required building from AUR, and the build process kept failing with obscure dependency conflicts</li>
+<li><strong>KDE 6.2 Incompatibility:</strong> Even when I got it running, Guacamole couldn&#39;t handle KDE&#39;s Wayland implementation properly</li>
+<li><strong>Performance:</strong> The VNC backend had noticeable lag, even on my local network</li>
+<li><strong>Complexity:</strong> The entire stack (Tomcat + guacd + database + nginx + SSL) was extremely heavy for what I needed</li>
+</ol>
+<p>At this point, I had more tabs open about Tomcat errors than actual work. Not ideal.</p>
+<p><strong>The Key Insight:</strong> Sometimes browser-based solutions aren&#39;t the answer. The abstraction layers (VNC/RDP → guacd → HTTP → browser) introduced too much latency and complexity. The promise of &quot;access from anywhere&quot; wasn&#39;t worth the performance hit and maintenance nightmare.</p>
+<h3>The Solution: KRDP (KDE Remote Desktop Protocol)</h3>
+<p>At this point, I was disappointed enough to give up and just SSH into everything. But then...</p>
+<p>Enter KRDP—KDE&#39;s native remote desktop protocol. I was properly sceptical after the Guacamole saga, but have a look:</p>
+<pre><code class="language-bash"># On Arch (server)
+sudo pacman -Syu krdp
+
+# Enable the service
+systemctl --user enable --now app-org.kde.krdpserver.service
+
+# That&#39;s it.
+</code></pre>
+<p style="text-align: center; margin: 2em auto 0.5em;"><img src="https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-1-the-journey-through-remote-desktop-solutions.png" alt="Figure 1: The Journey Through Remote Desktop Solutions" title="Figure 1: The Journey Through Remote Desktop Solutions" style="max-width: 100%; height: auto; display: inline-block; border-radius: 4px;" /></p><p style="text-align: center; font-style: italic; color: #666; font-size: 0.85em; margin: 0.5em auto 2em; line-height: 1.4;">Figure 1: The Journey Through Remote Desktop Solutions</p>
+
+<p><strong>Why KRDP Works:</strong></p>
+<ol>
+<li><strong>Native Wayland Support:</strong> Built by the KDE team specifically for KDE Plasma on Wayland</li>
+<li><strong>Standard Protocol:</strong> Uses RDP (Remote Desktop Protocol), which is well-optimised and has excellent clients</li>
+<li><strong>Security First:</strong> Only listens on localhost by default—you must tunnel through SSH</li>
+<li><strong>Zero Configuration:</strong> Works out of the box with your existing KDE user credentials</li>
+<li><strong>Performance:</strong> Direct RDP connection with no translation layers</li>
+</ol>
+<p>Properly sorted, in under ten minutes.</p>
+<h3>The Architecture</h3>
+<p>The final setup is elegant:</p>
+<pre><code>MacBook → SSH Tunnel → localhost:3389 → KRDP → KDE Plasma (Wayland)
+</code></pre>
+<p><strong>On the server (Arch):</strong></p>
+<pre><code class="language-bash"># KRDP runs automatically with KDE
+systemctl --user status app-org.kde.krdpserver.service
+</code></pre>
+<p><strong>On the client (MacBook):</strong></p>
+<pre><code class="language-bash"># Create SSH tunnel (port 3389 is RDP standard)
+ssh -p 2222 -L 3389:localhost:3389 myuser@myserver.example.com
+
+# Then connect with Microsoft Remote Desktop to localhost:3389
+</code></pre>
+<p style="text-align: center; margin: 2em auto 0.5em;"><img src="https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-2-krdp-architecture-final-solution.png" alt="Figure 2: KRDP Architecture (Final Solution)" title="Figure 2: KRDP Architecture (Final Solution)" style="max-width: 100%; height: auto; display: inline-block; border-radius: 4px;" /></p><p style="text-align: center; font-style: italic; color: #666; font-size: 0.85em; margin: 0.5em auto 2em; line-height: 1.4;">Figure 2: KRDP Architecture (Final Solution)</p>
+
+<h3>Why This Architecture is Better</h3>
+<ol>
+<li><strong>Security by Design:</strong> KRDP only listens on localhost, so it&#39;s never exposed to the internet. SSH provides authentication and encryption. Proper defence in depth without the faff.</li>
+<li><strong>One Port to Forward:</strong> Only SSH port needs to be forwarded on your router. The RDP connection is tunnelled through SSH. Simple is secure.</li>
+<li><strong>Mature Client Software:</strong> Microsoft Remote Desktop (free on macOS App Store) is polished, feature-rich, and reliable. No janky browser interface.</li>
+<li><strong>Low Latency:</strong> Direct RDP protocol means minimal overhead—even on LAN, the difference is noticeable compared to VNC-based solutions. It&#39;s properly responsive, even over LTE when I&#39;m out and about.</li>
+</ol>
+<h3>Lessons Learned</h3>
+<p>Right, this is definitely going to happen again. I&#39;ve got loads of ideas brewing—the Open Source and Linux world is so rich, I just lack a bit of time. So, speaking of not wasting too much of it, here are some lessons to apply next time:</p>
+<ol>
+<li><strong>Start with Native Solutions:</strong> Check what your desktop environment provides before reaching for third-party tools. KRDP should have been my first choice, not my last. The KDE team knows their stuff better than anyone else.</li>
+<li><strong>Wayland is the Future:</strong> Solutions that don&#39;t support Wayland are on borrowed time. If you&#39;re on Arch with KDE 6.x, plan for Wayland-only. X11 solutions? Forget it.</li>
+<li><strong>Complexity is a Security Risk:</strong> Every additional component (Tomcat, guacd, etc.) is another thing to configure, maintain, and secure. Simple solutions are often more secure. And definitely easier to debug at 11pm.</li>
+<li><strong>Browser-Based ≠ Better:</strong> The promise of &quot;access from anywhere with no client&quot; sounds great, but native clients are faster, more reliable, and often provide a better experience. Sometimes old-school desktop apps win.</li>
+<li><strong>The Arch Wiki is Good, But...</strong> Sometimes the cutting edge moves faster than documentation. KRDP was barely mentioned in remote access guides when I started, but it&#39;s the best solution for modern KDE. Worth checking the project&#39;s own docs too.</li>
+</ol>
+<p style="text-align: center; margin: 2em auto 0.5em;"><img src="https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-3-security-layers.png" alt="Figure 3: Security Layers" title="Figure 3: Security Layers" style="max-width: 100%; height: auto; display: inline-block; border-radius: 4px;" /></p><p style="text-align: center; font-style: italic; color: #666; font-size: 0.85em; margin: 0.5em auto 2em; line-height: 1.4;">Figure 3: Security Layers</p>
+
+<h3>The Final Setup</h3>
+<p>After a week of trial and error, I have:</p>
+<ul>
+<li>✅ Native KDE Plasma remote access</li>
+<li>✅ Full Wayland support</li>
+<li>✅ Secure SSH tunnelling</li>
+<li>✅ Excellent performance (even over LTE)</li>
+<li>✅ Professional RDP client on macOS</li>
+<li>✅ Minimal complexity (no Tomcat, no VNC, no translation layers)</li>
+</ul>
+<p><strong>Time to set up:</strong> ~30 minutes (once you know what to use)<br><strong>Time I actually spent:</strong> ~1 week (learning what NOT to use)</p>
+<p>Worth it? Absolutely. Would I do it again? Probably, knowing me.</p>
+<h3>Conclusion</h3>
+<p>If you&#39;re running KDE Plasma 6.x on Arch Linux and need remote desktop access, skip the legacy solutions. KRDP is purpose-built for your exact use case, and the SSH tunnel approach provides excellent security without sacrificing performance.</p>
+<p>Turns out sometimes the newest tool actually <em>is</em> the right tool. Especially when it&#39;s built by the people who made your desktop in the first place. Who knew?</p>
+<hr>
+<p><strong>Next in this series:</strong> &quot;Implementing Conditional 2FA: Why Your LAN Doesn&#39;t Need It, But the Internet Does&quot;</p>
+<hr>
+
+</body>
+</html>

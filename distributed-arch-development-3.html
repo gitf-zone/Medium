@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building a Distributed Development Environment: When to Expose, When to Tunnel</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 0.5em;
+            line-height: 1.2;
+        }
+        h2 {
+            font-size: 2em;
+            font-weight: 600;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }
+        h3 {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-top: 1.3em;
+            margin-bottom: 0.5em;
+        }
+        p {
+            margin-bottom: 1.5em;
+        }
+        figure {
+            margin: 2.5em auto;
+            text-align: center;
+            padding: 1em 0;
+            max-width: 100%;
+        }
+        figure img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto 1em auto;
+            border-radius: 4px;
+        }
+        figcaption {
+            margin-top: 0.5em;
+            font-style: italic;
+            color: #666;
+            font-size: 0.95em;
+            text-align: center;
+            display: block;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 2em auto;
+        }
+        em {
+            font-style: italic;
+        }
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 1em;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 3px solid #333;
+            padding-left: 1em;
+            margin-left: 0;
+            font-style: italic;
+            color: #666;
+        }
+        ul, ol {
+            margin-bottom: 1.5em;
+            padding-left: 2em;
+        }
+        li {
+            margin-bottom: 0.5em;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 2em 0;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+<h1>Building a Distributed Development Environment: When to Expose, When to Tunnel</h1>
+<h2>Subtitle: Architecting Secure Service Access Across Server and Laptop</h2>
+<h3>The Modern Development Dilemma</h3>
+<p>I&#39;m building an LLM-powered knowledge graph application. Sounds fancy, but really it&#39;s just a lot of databases talking to each other. My Arch Linux server does all the heavy lifting:</p>
+<ul>
+<li>Neo4j Community Edition LTS (for development and visualisation)</li>
+<li>PostgreSQL 17 with Apache AGE (graph database extension), as an experimental alternative</li>
+<li>Ollama with an RTX 5080 (16GB VRAM — proper local LLM inference at last)</li>
+<li>Python services that orchestrate everything</li>
+</ul>
+<p>But here&#39;s the thing: I don&#39;t always want to work directly on the server. My MacBook is where the IDE sometimes lives, where the browser tabs multiply like rabbits, where the actual <em>developing</em> often happens. The server is the engine room; the laptop is the bridge.</p>
+<p><strong>The Problem:</strong> All my services run on the server, but my development workflow partially lives on the MacBook. I need secure, performant access to databases and APIs across devices — without exposing everything to the internet and becoming yet another story on HackerNews about someone leaving their database wide open.</p>
+<h3>The Architecture Challenge</h3>
+<p>There are three approaches to accessing server services from a remote device, each with different security and performance trade-offs. I tried all three. Naturally.</p>
+<h4>Option 1: Everything via HTTPS + 2FA (Maximum Security)</h4>
+<pre><code>MacBook → HTTPS → nginx → Authelia (2FA) → PostgreSQL/Neo4j
+</code></pre>
+<p>✅ Extremely secure (2FA for every request)<br>❌ Requires human interaction (can&#39;t automate)<br>❌ HTTP overhead for database protocols<br>❌ Complex: need PostgREST or similar HTTP wrapper</p>
+<p>This felt like using a sledgehammer to crack a nut. Also, entering a TOTP code every time I want to run a database query? No thanks.</p>
+<h4>Option 2: VPN Everything (Traditional Approach)</h4>
+<pre><code>MacBook → VPN tunnel → Server&#39;s internal network → Direct DB access
+</code></pre>
+<p>✅ Secure encrypted tunnel<br>✅ Direct protocol access<br>❌ VPN overhead on every connection<br>❌ Complex to set up and maintain<br>❌ Can be slow on mobile networks</p>
+<p>Considered this. Then remembered every corporate VPN I&#39;ve ever used and how they inevitably die at the worst possible moment.</p>
+<h4>Option 3: Layered Security by Context (The Solution)</h4>
+<pre><code>LAN:      MacBook → Direct Connection → PostgreSQL/Neo4j
+External: MacBook → SSH Tunnel → Server → PostgreSQL/Neo4j
+</code></pre>
+<p>✅ Zero overhead on LAN<br>✅ Strong security when remote<br>✅ Native database protocols<br>✅ Easy to switch contexts</p>
+<p>I chose Option 3. Naturally. Here&#39;s why and how.</p>
+<h3>Principle 1: Your LAN is Already a Security Perimeter</h3>
+<p><strong>The Insight:</strong> When your MacBook and server are both on your home WiFi, they&#39;re already behind:</p>
+<ul>
+<li>WiFi encryption (WPA2/WPA3)</li>
+<li>Router firewall</li>
+<li>Physical security (someone has to be in your home)</li>
+</ul>
+<p>Adding additional security layers within your LAN:</p>
+<ul>
+<li>Slows down legitimate traffic</li>
+<li>Doesn&#39;t significantly improve security</li>
+<li>Makes development painful</li>
+</ul>
+<p><strong>The Decision:</strong> On LAN, expose databases with native protocols. No HTTP wrapper, no tunnels, no overhead. Just databases being databases.</p>
+<p>This might sound risky if you&#39;re used to defence-in-depth everywhere, but hear me out.</p>
+<h3>Principle 2: The Internet is Hostile</h3>
+<p>When accessing your server from a coffee shop, 5G, or mate&#39;s house:</p>
+<ul>
+<li>Your traffic crosses untrusted networks</li>
+<li>Your source IP is unknown to the server</li>
+<li>Man-in-the-middle attacks are possible</li>
+<li>Port scans and brute force are common</li>
+</ul>
+<p><strong>The Decision:</strong> External access must be tunnelled through SSH (with 2FA) or blocked entirely. No exceptions, no shortcuts.</p>
+<p>These two principles — trust your LAN, distrust the internet — form the foundation of everything that follows.</p>
+<h3>Implementation: Neo4j Dual-Binding</h3>
+<p>Neo4j needs to be accessible from both the server (localhost) and the MacBook (LAN IP). Docker makes this straightforward.</p>
+<h4>Docker Compose Configuration</h4>
+<pre><code class="language-yaml"># /home/user/Containers/neo4j/docker-compose.yml
+version: &#39;3.8&#39;
+
+services:
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: neo4j-dev
+    restart: unless-stopped
+    ports:
+      # Bind to both localhost (for server/nginx) and LAN IP (for MacBook)
+      - &#39;127.0.0.1:7474:7474&#39; # Browser UI on localhost
+      - &#39;192.168.1.107:7474:7474&#39; # Browser UI on LAN
+      - &#39;127.0.0.1:7687:7687&#39; # Bolt protocol on localhost
+      - &#39;192.168.1.107:7687:7687&#39; # Bolt protocol on LAN
+    environment:
+      - NEO4J_AUTH=neo4j/development123
+      - NEO4J_server_http_listen__address=:7474
+      - NEO4J_server_bolt_listen__address=:7687
+</code></pre>
+<p><strong>Why This Works:</strong></p>
+<ol>
+<li><strong>Port 7474 (Browser UI):</strong> Accessible at <a href="http://localhost:7474">http://localhost:7474</a> (from server) and <a href="http://192.168.1.107:7474">http://192.168.1.107:7474</a> (from MacBook). Perfect for visualising graphs whilst sipping coffee.</li>
+<li><strong>Port 7687 (Bolt Protocol):</strong> The native Neo4j protocol for fast graph queries</p>
+<ul>
+<li>From server: <code>bolt://localhost:7687</code></li>
+<li>From MacBook: <code>bolt://192.168.1.107:7687</code></li>
+</ul>
+</li>
+<li><strong>Docker Isolation:</strong> The container is still isolated—only the specified ports are exposed. Everything else stays locked down.</li>
+<li><strong>External Access:</strong> Still protected via nginx + Authelia at <a href="https://my-public-endpoint/neo4j/">https://my-public-endpoint/neo4j/</a>. For when I need to show someone a graph but they&#39;re not on my network.</li>
+</ol>
+<h3>Implementation: PostgreSQL (Localhost Only)</h3>
+<p>PostgreSQL is a different story. It contains production data and doesn&#39;t need to be directly accessible from the MacBook for my use case.</p>
+<h4>The Configuration</h4>
+<pre><code class="language-bash"># /var/lib/postgres/data/postgresql.conf
+listen_addresses = &#39;localhost&#39;  # Only accept local connections
+port = 5432
+</code></pre>
+<p><strong>Why Localhost Only:</strong></p>
+<ol>
+<li><strong>Security:</strong> PostgreSQL has a complex permission system. Mistakes in <code>pg_hba.conf</code> can expose data. I&#39;ve seen it happen. Not pretty.</li>
+<li><strong>My Use Case:</strong> My Python code runs on the server, so local access is sufficient. The MacBook doesn&#39;t need direct PostgreSQL access for development.</li>
+<li><strong>When Needed:</strong> I can SSH tunnel from MacBook for admin tasks:</p>
+<pre><code class="language-bash">ssh -L 5432:localhost:5432 user@server
+psql -h localhost -U postgres
+</code></pre>
+</li>
+</ol>
+<p>Simple, secure, and it works perfectly when I need to run database migrations or check query performance.</p>
+<h3>The Network Architecture Diagram</h3>
+<pre><code class="language-mermaid">graph TB
+    subgraph LAN[&quot;Home Network (LAN)&lt;br/&gt;192.168.1.0/24&quot;]
+        MacBook[&quot;MacBook&lt;br/&gt;192.168.1.192&lt;br/&gt;• IDE, Browser&lt;br/&gt;• Python Code&lt;br/&gt;• Dev Tools&quot;]
+        Server[&quot;Server&lt;br/&gt;192.168.1.107&lt;br/&gt;• PostgreSQL (localhost:5432)&lt;br/&gt;• Neo4j (192.168.1.107:7474,7687)&lt;br/&gt;• Ollama + RTX5080 (localhost:11434)&lt;br/&gt;• nginx (80, 443)&quot;]
+
+        MacBook --&gt;|&quot;Direct Connections&lt;br/&gt;No Tunnel&lt;br/&gt;No Overhead&quot;| Server
+    end
+
+    Security[&quot;WiFi Security:&lt;br/&gt;WPA3 + Router Firewall&quot;]
+
+    LAN -.-&gt;|Protected by| Security
+
+    Internet[&quot;Internet&lt;br/&gt;(Hostile)&quot;]
+
+    LAN &lt;--&gt;|Router| Internet
+
+    subgraph External[&quot;External Access&lt;br/&gt;(Coffee Shop, 5G, etc.)&quot;]
+        RemoteMac[&quot;MacBook (Remote)&quot;]
+        Tunnel[&quot;SSH Tunnel Required:&lt;br/&gt;ssh -L 7474:localhost:7474&lt;br/&gt;-L 7687:localhost:7687&lt;br/&gt;-L 11434:localhost:11434&lt;br/&gt;user@services.example.com&quot;]
+        Connect[&quot;Then connect to:&lt;br/&gt;bolt://localhost:7687&lt;br/&gt;http://localhost:11434&quot;]
+
+        RemoteMac --&gt; Tunnel
+        Tunnel --&gt; Connect
+    end
+
+    External --&gt;|SSH + 2FA| Internet
+
+    style LAN fill:#e1f5ff
+    style Server fill:#fff9e1
+    style MacBook fill:#f0e1ff
+    style Security fill:#ccffcc
+    style Internet fill:#ffcccc
+    style External fill:#ffe1e1
+</code></pre>
+<!-- caption: Network Architecture - LAN Direct vs. External SSH Tunnel -->
+
+<h3>Python Code: Context-Aware Connection</h3>
+<p>Here&#39;s the bit I&#39;m genuinely proud of. My Python code automatically detects whether it&#39;s on the server, on LAN, or needs a tunnel — and connects accordingly:</p>
+<pre><code class="language-python">import socket
+import os
+from neo4j import GraphDatabase
+
+def get_neo4j_connection():
+    &quot;&quot;&quot;
+    Return Neo4j connection based on network context.
+    - On server: use localhost
+    - On MacBook LAN: use server&#39;s LAN IP
+    - On MacBook remote: assume SSH tunnel to localhost
+    &quot;&quot;&quot;
+    hostname = socket.gethostname()
+
+    if hostname == &quot;user&quot;:
+        # Running on server
+        uri = &quot;bolt://localhost:7687&quot;
+    elif is_on_lan():
+        # MacBook on home network
+        uri = &quot;bolt://192.168.1.107:7687&quot;
+    else:
+        # MacBook remote (assume SSH tunnel)
+        uri = &quot;bolt://localhost:7687&quot;
+
+    return GraphDatabase.driver(uri, auth=(&quot;neo4j&quot;, os.getenv(&quot;NEO4J_PASSWORD&quot;)))
+
+def is_on_lan():
+    &quot;&quot;&quot;Check if we&#39;re on the home LAN by trying to reach the server.&quot;&quot;&quot;
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        result = sock.connect_ex((&#39;192.168.1.107&#39;, 7687))
+        sock.close()
+        return result == 0
+    except:
+        return False
+</code></pre>
+<p><strong>Why This is Clever:</strong></p>
+<ul>
+<li>One codebase works everywhere</li>
+<li>No configuration files to manage</li>
+<li>Automatic failover to tunnel when remote</li>
+<li>Fast LAN connections when available</li>
+</ul>
+<p>I can develop on the server, test on the MacBook at home, then take the MacBook to a coffee shop and everything just works. Same code, different context.</p>
+<h3>The SSH Tunnel Script</h3>
+<p>For remote work, I have a simple script that sets up all the tunnels I need:</p>
+<pre><code class="language-bash">#!/bin/bash
+# tunnel.sh - Set up SSH tunnels for remote development
+
+echo &quot;Setting up development tunnels...&quot;
+
+# Create SSH tunnel with multiple port forwards
+ssh -N -L 7474:localhost:7474 \
+       -L 7687:localhost:7687 \
+       -L 11434:localhost:11434 \
+       -L 5432:localhost:5432 \
+       -p 22 \
+       user@my-service &amp;
+
+TUNNEL_PID=$!
+echo &quot;Tunnels established (PID: $TUNNEL_PID)&quot;
+echo &quot;&quot;
+echo &quot;Available services:&quot;
+echo &quot;  - Neo4j Browser: http://localhost:7474&quot;
+echo &quot;  - Neo4j Bolt:    bolt://localhost:7687&quot;
+echo &quot;  - Ollama:        http://localhost:11434&quot;
+echo &quot;  - PostgreSQL:    localhost:5432&quot;
+echo &quot;&quot;
+echo &quot;Press Ctrl+C to close tunnels&quot;
+
+# Wait for interrupt
+trap &quot;kill $TUNNEL_PID; echo &#39;Tunnels closed&#39;; exit&quot; INT
+wait $TUNNEL_PID
+</code></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>One script to set up all tunnels — databases and LLM inference</li>
+<li>Runs in background</li>
+<li>Automatically cleans up on exit</li>
+<li>Shows what&#39;s available</li>
+</ul>
+<p>Dead simple. I run it, open the MacBook, and everything just works as if I&#39;m sitting next to the server. Which, from a coffee shop in Paris, is rather satisfying.</p>
+<h3>Real-World Performance Comparison</h3>
+<p>Right, let&#39;s talk numbers. I measured query performance across the different connection scenarios because I&#39;m a geek and I wanted to know:</p>
+<h4>Neo4j Cypher Query (1000 node traversal)</h4>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Latency</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Server (localhost)</td>
+<td>45ms</td>
+<td>Baseline</td>
+</tr>
+<tr>
+<td>MacBook (LAN direct)</td>
+<td>48ms</td>
+<td>+3ms for network hop</td>
+</tr>
+<tr>
+<td>MacBook (SSH tunnel on LAN)</td>
+<td>52ms</td>
+<td>+7ms for tunnel overhead</td>
+</tr>
+<tr>
+<td>MacBook (SSH tunnel on 5G)</td>
+<td>180ms</td>
+<td>Network latency dominates</td>
+</tr>
+</tbody></table>
+<p><strong>Insight:</strong> On LAN, the tunnel overhead is minimal (7ms), but why pay it when you don&#39;t need to? On 5G, network latency dominates anyway, so tunnel overhead is negligible.</p>
+<h4>PostgreSQL Query (100 row SELECT)</h4>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Latency</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Server (localhost)</td>
+<td>12ms</td>
+<td>Baseline</td>
+</tr>
+<tr>
+<td>MacBook (SSH tunnel on LAN)</td>
+<td>18ms</td>
+<td>+6ms overhead</td>
+</tr>
+<tr>
+<td>MacBook (SSH tunnel on 5G)</td>
+<td>95ms</td>
+<td>Network latency</td>
+</tr>
+</tbody></table>
+<p>The conclusion? On LAN, every millisecond of overhead matters for tight development loops. On 5G, you&#39;re already dealing with network latency, so a few extra milliseconds for encryption is irrelevant.</p>
+<h3>Security Rules to Live By</h3>
+<p>After building this setup — and making a few mistakes along the way, naturally — here are the principles I&#39;ve settled on:</p>
+<h4>1. Never Expose Databases Directly to Internet</h4>
+<pre><code class="language-bash"># WRONG - PostgreSQL accessible from anywhere
+listen_addresses = &#39;*&#39;
+# In firewall: allow port 5432 from internet
+</code></pre>
+<p>Even with strong passwords and SSL, you&#39;re:</p>
+<ul>
+<li>Creating a target for automated scanners (they WILL find it)</li>
+<li>Trusting your database&#39;s security implementation (bold)</li>
+<li>One misconfiguration away from data exposure (seen it happen)</li>
+</ul>
+<p>Just don&#39;t. Use SSH tunnels.</p>
+<h4>2. LAN Exposure is Different from Internet Exposure</h4>
+<pre><code class="language-bash"># OK - Neo4j accessible on LAN
+ports:
+  - &quot;192.168.1.107:7687:7687&quot;
+
+# WRONG - Neo4j accessible from internet
+ports:
+  - &quot;0.0.0.0:7687:7687&quot;  # Binds to all interfaces
+</code></pre>
+<p>Your LAN is trusted. The internet is not. These are different threat models. Treat them accordingly.</p>
+<h4>3. SSH Tunnels are Free Security</h4>
+<p>SSH provides:</p>
+<ul>
+<li>Strong authentication (keys + optional 2FA)</li>
+<li>Encryption (AES)</li>
+<li>Compression (useful on slow networks)</li>
+<li>Port forwarding (access anything on the server)</li>
+</ul>
+<p>For external access, there&#39;s no reason NOT to use an SSH tunnel. It&#39;s already there, it&#39;s already secure, just use it.</p>
+<h4>4. Defence in Depth</h4>
+<p>Even on LAN, I have:</p>
+<ul>
+<li>Database authentication (username/password)</li>
+<li>Application-level access control</li>
+<li>Audit logging</li>
+<li>Regular backups</li>
+</ul>
+<p>LAN doesn&#39;t mean &quot;no security&quot;—it means &quot;appropriate security.&quot; There&#39;s a difference.</p>
+<h3>Lessons Learned</h3>
+<p>Right, here&#39;s what I&#39;d tell past me if I could:</p>
+<h4>1. Development Databases vs. Production Databases</h4>
+<p>My development Neo4j is exposed on LAN because:</p>
+<ul>
+<li>It contains sample data (not sensitive)</li>
+<li>I&#39;m the only user</li>
+<li>Development workflow benefits from direct access</li>
+</ul>
+<p>If this were production data, I&#39;d use stricter controls even on LAN. Context matters.</p>
+<h4>2. The Laptop-as-Client Model</h4>
+<p>This one surprised me. My MacBook — a genuinely capable machine with proper specs — has essentially become a thin client. All the heavy lifting happens on the server: databases, LLM inference on the RTX 5080, container orchestration. The MacBook just runs my IDE, a browser, and the occasional Python script.</p>
+<p>Modern development increasingly means:</p>
+<ul>
+<li>Heavy services run on a server (databases, GPU inference, containers)</li>
+<li>Development tools run on a laptop (IDE, browser, terminal)</li>
+<li>The laptop is the interface; the server is the engine</li>
+</ul>
+<p>This model requires rethinking how services are exposed. Your laptop needs to reach the server&#39;s services efficiently and securely — but it doesn&#39;t need to <em>run</em> those services.</p>
+<h4>3. WiFi is Your Friend</h4>
+<p>Relying on WiFi for LAN security means:</p>
+<ul>
+<li>Choose WPA3 if your devices support it</li>
+<li>Use a strong, unique WiFi password (not your pet&#39;s name)</li>
+<li>Consider a separate guest network for untrusted devices</li>
+<li>Monitor connected devices on your router occasionally</li>
+</ul>
+<p>Your WiFi is your first line of defence. Don&#39;t neglect it.</p>
+<h4>4. Document Your Network Assumptions</h4>
+<p>My setup assumes:</p>
+<ul>
+<li>The 192.168.1.0/24 network is trusted</li>
+<li>Anyone with physical access to my home is authorised</li>
+<li>The router firewall blocks incoming internet connections</li>
+</ul>
+<p>If any of these assumptions change, my security model changes too. Write this stuff down.</p>
+<h3>Troubleshooting Common Issues</h3>
+<p>Because nothing ever works first time, does it?</p>
+<h4>Problem: MacBook can&#39;t connect to Neo4j on LAN</h4>
+<pre><code class="language-bash"># From MacBook, test connectivity
+nc -zv 192.168.1.107 7687
+</code></pre>
+<p>Possible causes:</p>
+<ol>
+<li>Docker container not running: <code>docker ps | grep neo4j</code></li>
+<li>Firewall blocking: <code>sudo firewall-cmd --list-all</code></li>
+<li>Wrong IP address: <code>ip addr show</code></li>
+</ol>
+<p>I&#39;ve hit all three of these at various points. Usually it&#39;s number 1 because I forgot to start the container after a reboot.</p>
+<h4>Problem: SSH tunnel works but can&#39;t connect to database</h4>
+<pre><code class="language-bash"># Check that tunnel is actually forwarding
+lsof -i :7687
+</code></pre>
+<p>If nothing is listening on localhost:7687, your tunnel isn&#39;t running or died. Restart it.</p>
+<h4>Problem: Connection works on LAN but not remotely</h4>
+<p>This is usually because:</p>
+<ol>
+<li>You forgot to start the SSH tunnel (classic)</li>
+<li>The tunnel&#39;s SSH connection died (check with <code>ps aux | grep ssh</code>)</li>
+<li>Your code is still trying to connect to the LAN IP instead of localhost</li>
+</ol>
+<h3>The Final Architecture</h3>
+<p>After all this work, here&#39;s what I&#39;ve ended up with — and honestly, I&#39;m rather pleased with it:</p>
+<p><strong>On Server (Arch Linux):</strong></p>
+<ul>
+<li>PostgreSQL: localhost:5432 (internal only)</li>
+<li>Neo4j: localhost:7474 + 192.168.1.107:7474 (internal + LAN)</li>
+<li>Ollama: localhost:11434 (RTX 5080 GPU, primary LLM inference)</li>
+<li>nginx: 443 (internet, with 2FA for sensitive endpoints)</li>
+<li>SSH: port 2356 (internet, with conditional 2FA)</li>
+</ul>
+<p><strong>On MacBook (Thin Client):</strong></p>
+<ul>
+<li>IDE, browser, terminal — the development interface</li>
+<li>Python code: connects via context-aware logic</li>
+<li>SSH tunnel script: for remote work</li>
+<li>Everything else? On the server where it belongs.</li>
+</ul>
+<p><strong>Performance:</strong></p>
+<ul>
+<li>LAN: Direct connections, ~3-7ms overhead vs localhost</li>
+<li>Remote: SSH tunnels, network latency dominates</li>
+<li>No HTTP overhead for native protocols</li>
+</ul>
+<p><strong>Security:</strong></p>
+<ul>
+<li>Zero internet exposure for raw database ports</li>
+<li>LAN protected by WiFi + router firewall</li>
+<li>External access requires SSH keys + 2FA</li>
+<li>Defence in depth with database auth + app-level controls</li>
+</ul>
+<h3>Conclusion</h3>
+<p>Building a distributed development environment is about understanding threat models and making trade-offs:</p>
+<ul>
+<li><strong>Security</strong> matters most when crossing trust boundaries (internet)</li>
+<li><strong>Performance</strong> matters most in tight development loops (LAN)</li>
+<li><strong>Complexity</strong> should be minimised everywhere</li>
+</ul>
+<p>By exposing services to LAN but tunnelling external access through SSH, you get the best of both worlds: fast local development and secure remote access.</p>
+<p>The key insight? Your network topology should inform your security model. LAN and internet are different environments with different risks. Your architecture should reflect that.</p>
+<p>And the best part? Once the tunnel script is running, the MacBook doesn&#39;t know — or care — whether it&#39;s on the sofa or in a coffee shop. The code just works. Which is exactly how it should be.</p>
+<hr>
+<p><strong>Series Complete!</strong></p>
+<p>If you found this series helpful, you might also enjoy:</p>
+<ul>
+<li>&quot;fail2ban: The Silent Guardian of Your SSH Port&quot;</li>
+<li>&quot;Authelia: Building a Self-Hosted SSO with TOTP 2FA&quot;</li>
+</ul>
+<hr>
+
+</body>
+</html>
