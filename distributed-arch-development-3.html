@@ -179,9 +179,9 @@ services:
     ports:
       # Bind to both localhost (for server/nginx) and LAN IP (for MacBook)
       - &#39;127.0.0.1:7474:7474&#39; # Browser UI on localhost
-      - &#39;192.168.1.107:7474:7474&#39; # Browser UI on LAN
+      - &#39;server_ip:7474:7474&#39; # Browser UI on LAN
       - &#39;127.0.0.1:7687:7687&#39; # Bolt protocol on localhost
-      - &#39;192.168.1.107:7687:7687&#39; # Bolt protocol on LAN
+      - &#39;server_ip:7687:7687&#39; # Bolt protocol on LAN
     environment:
       - NEO4J_AUTH=neo4j/development123
       - NEO4J_server_http_listen__address=:7474
@@ -189,11 +189,11 @@ services:
 </code></pre>
 <p><strong>Why This Works:</strong></p>
 <ol>
-<li><strong>Port 7474 (Browser UI):</strong> Accessible at <a href="http://localhost:7474">http://localhost:7474</a> (from server) and <a href="http://192.168.1.107:7474">http://192.168.1.107:7474</a> (from MacBook). Perfect for visualising graphs whilst sipping coffee.</li>
+<li><strong>Port 7474 (Browser UI):</strong> Accessible at <a href="http://localhost:7474">http://localhost:7474</a> (from server) and <a href="http://server_ip:7474">http://server_ip:7474</a> (from MacBook). Perfect for visualising graphs whilst sipping coffee.</li>
 <li><strong>Port 7687 (Bolt Protocol):</strong> The native Neo4j protocol for fast graph queries</p>
 <ul>
 <li>From server: <code>bolt://localhost:7687</code></li>
-<li>From MacBook: <code>bolt://192.168.1.107:7687</code></li>
+<li>From MacBook: <code>bolt://server_ip:7687</code></li>
 </ul>
 </li>
 <li><strong>Docker Isolation:</strong> The container is still isolated—only the specified ports are exposed. Everything else stays locked down.</li>
@@ -218,41 +218,7 @@ psql -h localhost -U postgres
 </ol>
 <p>Simple, secure, and it works perfectly when I need to run database migrations or check query performance.</p>
 <h3>The Network Architecture Diagram</h3>
-<pre><code class="language-mermaid">graph TB
-    subgraph LAN[&quot;Home Network (LAN)&lt;br/&gt;192.168.1.0/24&quot;]
-        MacBook[&quot;MacBook&lt;br/&gt;192.168.1.192&lt;br/&gt;• IDE, Browser&lt;br/&gt;• Python Code&lt;br/&gt;• Dev Tools&quot;]
-        Server[&quot;Server&lt;br/&gt;192.168.1.107&lt;br/&gt;• PostgreSQL (localhost:5432)&lt;br/&gt;• Neo4j (192.168.1.107:7474,7687)&lt;br/&gt;• Ollama + RTX5080 (localhost:11434)&lt;br/&gt;• nginx (80, 443)&quot;]
-
-        MacBook --&gt;|&quot;Direct Connections&lt;br/&gt;No Tunnel&lt;br/&gt;No Overhead&quot;| Server
-    end
-
-    Security[&quot;WiFi Security:&lt;br/&gt;WPA3 + Router Firewall&quot;]
-
-    LAN -.-&gt;|Protected by| Security
-
-    Internet[&quot;Internet&lt;br/&gt;(Hostile)&quot;]
-
-    LAN &lt;--&gt;|Router| Internet
-
-    subgraph External[&quot;External Access&lt;br/&gt;(Coffee Shop, 5G, etc.)&quot;]
-        RemoteMac[&quot;MacBook (Remote)&quot;]
-        Tunnel[&quot;SSH Tunnel Required:&lt;br/&gt;ssh -L 7474:localhost:7474&lt;br/&gt;-L 7687:localhost:7687&lt;br/&gt;-L 11434:localhost:11434&lt;br/&gt;user@services.example.com&quot;]
-        Connect[&quot;Then connect to:&lt;br/&gt;bolt://localhost:7687&lt;br/&gt;http://localhost:11434&quot;]
-
-        RemoteMac --&gt; Tunnel
-        Tunnel --&gt; Connect
-    end
-
-    External --&gt;|SSH + 2FA| Internet
-
-    style LAN fill:#e1f5ff
-    style Server fill:#fff9e1
-    style MacBook fill:#f0e1ff
-    style Security fill:#ccffcc
-    style Internet fill:#ffcccc
-    style External fill:#ffe1e1
-</code></pre>
-<!-- caption: Network Architecture - LAN Direct vs. External SSH Tunnel -->
+<p style="text-align: center; margin: 2em auto 0.5em;"><img src="https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-1-network-architecture-lan-direct-vs-external-ssh-tunnel.png" alt="Figure 1: Network Architecture - LAN Direct vs. External SSH Tunnel" title="Figure 1: Network Architecture - LAN Direct vs. External SSH Tunnel" style="max-width: 100%; height: auto; display: inline-block; border-radius: 4px;" /></p><p style="text-align: center; font-style: italic; color: #666; font-size: 0.85em; margin: 0.5em auto 2em; line-height: 1.4;">Figure 1: Network Architecture - LAN Direct vs. External SSH Tunnel</p>
 
 <h3>Python Code: Context-Aware Connection</h3>
 <p>Here&#39;s the bit I&#39;m genuinely proud of. My Python code automatically detects whether it&#39;s on the server, on LAN, or needs a tunnel — and connects accordingly:</p>
@@ -274,7 +240,7 @@ def get_neo4j_connection():
         uri = &quot;bolt://localhost:7687&quot;
     elif is_on_lan():
         # MacBook on home network
-        uri = &quot;bolt://192.168.1.107:7687&quot;
+        uri = &quot;bolt://server_ip:7687&quot;
     else:
         # MacBook remote (assume SSH tunnel)
         uri = &quot;bolt://localhost:7687&quot;
@@ -286,7 +252,7 @@ def is_on_lan():
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(1)
-        result = sock.connect_ex((&#39;192.168.1.107&#39;, 7687))
+        result = sock.connect_ex((&#39;server_ip&#39;, 7687))
         sock.close()
         return result == 0
     except:
@@ -414,7 +380,7 @@ listen_addresses = &#39;*&#39;
 <h4>2. LAN Exposure is Different from Internet Exposure</h4>
 <pre><code class="language-bash"># OK - Neo4j accessible on LAN
 ports:
-  - &quot;192.168.1.107:7687:7687&quot;
+  - &quot;server_ip:7687:7687&quot;
 
 # WRONG - Neo4j accessible from internet
 ports:
@@ -479,7 +445,7 @@ ports:
 <p>Because nothing ever works first time, does it?</p>
 <h4>Problem: MacBook can&#39;t connect to Neo4j on LAN</h4>
 <pre><code class="language-bash"># From MacBook, test connectivity
-nc -zv 192.168.1.107 7687
+nc -zv server_ip 7687
 </code></pre>
 <p>Possible causes:</p>
 <ol>
@@ -505,7 +471,7 @@ lsof -i :7687
 <p><strong>On Server (Arch Linux):</strong></p>
 <ul>
 <li>PostgreSQL: localhost:5432 (internal only)</li>
-<li>Neo4j: localhost:7474 + 192.168.1.107:7474 (internal + LAN)</li>
+<li>Neo4j: localhost:7474 + server_ip:7474 (internal + LAN)</li>
 <li>Ollama: localhost:11434 (RTX 5080 GPU, primary LLM inference)</li>
 <li>nginx: 443 (internet, with 2FA for sensitive endpoints)</li>
 <li>SSH: port 2356 (internet, with conditional 2FA)</li>
