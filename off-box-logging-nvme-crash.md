@@ -28,7 +28,7 @@ The catch: UDP is fire-and-forget. If nobody's *listening* on the network at the
 
 And I had the perfect host hiding in plain sight: **my ISP router.** It runs 24/7, it's independent of my machine, and — crucially — it can run a tiny virtual machine. So I spun up a featherweight Debian VM on the router itself and gave it one job: sit there forever, catch every kernel message my box shouts, and write it to *its own* disk.
 
-![Figure 1: The dying machine broadcasts its last words over the network, before its own disk is even in the loop. The watchtower lives on separate hardware that never goes down with it.](https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-1-the-dying-machine-broadcasts-its-last-words-over-the-network-before-its-own-disk-is-even-in-the-loop-the-watchtower-lives-on-separate-hardware-that-never-goes-down-with-it.png)
+![Figure 1: The dying machine broadcasts its last words over the network, before its own disk is even in the loop. The watchtower lives on separate hardware that never goes down with it.](https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-1-the-dying-machine-broadcasts-its-last-words-over-t.png)
 *Figure 1: The dying machine broadcasts its last words over the network, before its own disk is even in the loop. The watchtower lives on separate hardware that never goes down with it.*
 
 While I was at it, I gave the little watchtower two more sensors: it pings the box every few seconds to timestamp the *exact* moment of death, and it polls the smart plug once a minute to log the mains voltage. Three independent black boxes, all off-site, all surviving whatever kills the main machine.
