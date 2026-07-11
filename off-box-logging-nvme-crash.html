@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Debug a Machine That Dies Before It Can Tell You Why</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 0.5em;
+            line-height: 1.2;
+        }
+        h2 {
+            font-size: 2em;
+            font-weight: 600;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }
+        h3 {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-top: 1.3em;
+            margin-bottom: 0.5em;
+        }
+        p {
+            margin-bottom: 1.5em;
+        }
+        figure {
+            margin: 2.5em auto;
+            text-align: center;
+            padding: 1em 0;
+            max-width: 100%;
+        }
+        figure img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto 1em auto;
+            border-radius: 4px;
+        }
+        figcaption {
+            margin-top: 0.5em;
+            font-style: italic;
+            color: #666;
+            font-size: 0.95em;
+            text-align: center;
+            display: block;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 2em auto;
+        }
+        em {
+            font-style: italic;
+        }
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 1em;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 3px solid #333;
+            padding-left: 1em;
+            margin-left: 0;
+            font-style: italic;
+            color: #666;
+        }
+        ul, ol {
+            margin-bottom: 1.5em;
+            padding-left: 2em;
+        }
+        li {
+            margin-bottom: 0.5em;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 2em 0;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+<h1>How to Debug a Machine That Dies Before It Can Tell You Why</h1>
+<h2>Subtitle: Six months of silent crashes, cracked by a log that left the building</h2>
+<h3>The ghost in the machine</h3>
+<p>For six months, my Arch Linux box had been dying on me. Not crashing in any polite, debuggable way — just <em>freezing</em>. Solid. Screen locked, keyboard dead, the works. I&#39;d hard-reset it, dig through the logs afterwards, and find… nothing.</p>
+<p>The journal just <strong>stopped</strong>, mid-sentence, on some boring routine line. No kernel panic. No out-of-memory kill. No stack trace. No warning. It was like reading a detective novel where the last page has been torn out — every single time.</p>
+<p>I chased everything. The GPU driver. A KDE update. Mains voltage — I even put a smart plug inline to log the wall power, convinced the flat&#39;s dodgy electrics were browning it out. Nothing stuck. The freezes kept coming, and the gap between them was <em>shrinking</em>: four days, then two, then twenty hours. Something was accelerating, and I was flying blind.</p>
+<h3>Why the logs kept lying to me</h3>
+<p>Here&#39;s the thing that took me embarrassingly long to internalise: <strong>a machine can&#39;t write down how it died if the thing that&#39;s dying is its ability to write things down.</strong></p>
+<p><code>journald</code> — the Linux logging daemon — writes to disk. If the failure takes out the disk path (or the storage controller, or the whole box), the last few seconds of evidence never get saved. The journal doesn&#39;t end because nothing happened. It ends because the machine lost the ability to record that something was happening.</p>
+<p>Local logging has a blind spot <em>exactly</em> when you need it most. I&#39;d been interrogating a witness who goes unconscious at the moment of the crime.</p>
+<p>So I needed the logs to leave the building <strong>before</strong> the disk was ever involved.</p>
+<h3>Netconsole: the kernel&#39;s emergency broadcast</h3>
+<p>Linux has a wonderfully brutal little feature called <strong>netconsole</strong>. Instead of writing kernel messages to disk, it fires them straight at the network card and broadcasts them as UDP packets. No filesystem. No user-space. No disk. It hooks in low enough that it keeps talking even as the rest of the machine is falling over.</p>
+<p>The catch: UDP is fire-and-forget. If nobody&#39;s <em>listening</em> on the network at the exact moment of death, the last words vanish into the ether. I needed an always-on receiver — one that would never, ever go down at the same time as the box it was watching.</p>
+<p>And I had the perfect host hiding in plain sight: <strong>my ISP router.</strong> It runs 24/7, it&#39;s independent of my machine, and — crucially — it can run a tiny virtual machine. So I spun up a featherweight Debian VM on the router itself and gave it one job: sit there forever, catch every kernel message my box shouts, and write it to <em>its own</em> disk.</p>
+<p style="text-align: center; margin: 2em auto 0.5em;"><img src="https://raw.githubusercontent.com/gitf-zone/Medium/main/images/figure-1-the-dying-machine-broadcasts-its-last-words-over-the-network-before-its-own-disk-is-even-in-the-loop-the-watchtower-lives-on-separate-hardware-that-never-goes-down-with-it.png" alt="Figure 1: The dying machine broadcasts its last words over the network, before its own disk is even in the loop. The watchtower lives on separate hardware that never goes down with it." title="Figure 1: The dying machine broadcasts its last words over the network, before its own disk is even in the loop. The watchtower lives on separate hardware that never goes down with it." style="max-width: 100%; height: auto; display: inline-block; border-radius: 4px;" /></p><p style="text-align: center; font-style: italic; color: #666; font-size: 0.85em; margin: 0.5em auto 2em; line-height: 1.4;">Figure 1: The dying machine broadcasts its last words over the network, before its own disk is even in the loop. The watchtower lives on separate hardware that never goes down with it.</p>
+
+<p>While I was at it, I gave the little watchtower two more sensors: it pings the box every few seconds to timestamp the <em>exact</em> moment of death, and it polls the smart plug once a minute to log the mains voltage. Three independent black boxes, all off-site, all surviving whatever kills the main machine.</p>
+<h3>The day it paid off</h3>
+<p>I finished wiring up the watchtower on a Tuesday. It caught a freeze <strong>that same afternoon.</strong></p>
+<p>Six months of torn-out final pages — and here, for the first time, was the full last chapter. The mains log was rock-steady through the whole event (there goes my electrical theory). The liveness log stamped the exact second the box went dark. And the kernel&#39;s dying broadcast, captured over the wire, said this:</p>
+<pre><code>nvme nvme0: controller is down; will reset: CSTS=0xffffffff
+nvme 0000:02:00.0: Unable to change power state from D3cold to D0, device inaccessible
+nvme nvme0: Disabling device after reset failure: -19
+</code></pre>
+<p>There it was. My NVMe SSD had dropped into <strong>D3cold</strong> — the deepest PCIe power-saving sleep — and <em>failed to wake up</em>. <code>CSTS=0xffffffff</code> is the reading you get when a device has physically fallen off the bus: all ones, nobody home. The drive went to sleep and simply never came back, and the operating system collapsed the instant it needed to read from a disk that no longer existed.</p>
+<p>Every stubborn detail of those six months suddenly clicked into place. Freezes always happened at <strong>idle</strong>? Of course — D3cold is a state you only reach when nothing&#39;s going on. Never a mark on the drive&#39;s health stats? It wasn&#39;t dying hardware; it was a power-management handshake that occasionally hung. &quot;The disk seems to die first&quot;? It literally left the bus.</p>
+<p>The best part: the kernel had been quietly suggesting the fix in that very same message. One boot parameter to forbid the drive from entering the state it couldn&#39;t wake from:</p>
+<pre><code>nvme_core.default_ps_max_latency_us=0
+</code></pre>
+<p>One line. Six months.</p>
+<h3>The lesson worth keeping</h3>
+<p>I&#39;m being honest with myself here: this is one captured crash, and the fix is now an experiment running while I&#39;m away for a few days. If the box sails past its old survival record, the case is closed. If it freezes again, my watchtower will catch <em>that</em> too — which is rather the point.</p>
+<p>Because the real win wasn&#39;t the kernel parameter. It was realising that <strong>the most important logs are the ones that survive the failure.</strong> Any monitoring that lives on the same machine, on the same disk, in the same failure domain, will always have a blind spot precisely where you&#39;re looking. Get your telemetry onto independent hardware — a spare Pi, a NAS, the router gathering dust in the corner — and point it at the thing most likely to fall over.</p>
+<p>For six months my machine couldn&#39;t tell me how it was dying. It turned out it had been shouting the answer the whole time. I just hadn&#39;t put anyone outside the building to listen.</p>
+
+</body>
+</html>
